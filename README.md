@@ -1,4 +1,4 @@
-# shardus-quic-net
+# shardus-net
 
 A library for sending and receiving JSON messages over raw TCP sockets.
 
