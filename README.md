@@ -17,10 +17,10 @@ npm i gitlab:shardus/shardus-net
 const port    = 1234
 const address = 'localhost'
 
-const snq = require('shardus-net')({ port, address })
+const sn = require('shardus-net')({ port, address })
 ```
 
-### snq.send
+### sn.send
 
 ```js
 // If you want to send a one-way message, not expecting a response:
@@ -28,9 +28,9 @@ const destinationPort    = 53
 const destinationAddress = 8.8.8.8
 const data               = { algebraic: 'Yeah!' }
 
-const protocol = await snq.send(destinationPort, destinationAddress, data)
+const protocol = await sn.send(destinationPort, destinationAddress, data)
 
-// Note: the promise returned by snq.send will resolve once the data has been
+// Note: the promise returned by sn.send will resolve once the data has been
 //       successfully sent, and has nothing to do with a response.
 
 // Now, if you _are_ expecting a response:
@@ -48,18 +48,18 @@ const onTimeout  = () => throw new Error('timed out :(')
 // You must be listening in order to receive responses, even if you don't
 // do anything with incoming data. In a normal use case, you will already
 // have a listener set up and do not need to execute this step.
-await snq.listen(() => {})
+await sn.listen(() => {})
 
-const protocol = await snq.send(destinationPort, destinationAddress, data, timeout, onResponse, onTimeout)
+const protocol = await sn.send(destinationPort, destinationAddress, data, timeout, onResponse, onTimeout)
 
 // Assuming the server you send to bounces back the data (see below for how to do this),
 // your console will log: "{ mathematical: 'Alright!' }"
 ```
 
-### snq.listen
+### sn.listen
 
 ```js
-const server = await snq.listen((data, remote, protocol, respond) => {
+const server = await sn.listen((data, remote, protocol, respond) => {
   // `remote` is an object with { address: <sender's address>, port: <origin port> }
   // Note: The port is of virtually no use -- it represents the port that data was
   //       send _from_, and you cannot send anything back to that port.
@@ -77,13 +77,13 @@ const server = await snq.listen((data, remote, protocol, respond) => {
 // net server, if you need it.
 ```
 
-### snq.stopListening
+### sn.stopListening
 
 ```js
 // When you want to spin down your listener, simply call stopListening and pass in
 // the server object you were given when you started listening.
 
-await snq.stopListening(servers)
+await sn.stopListening(servers)
 ```
 
 ## Contributors
