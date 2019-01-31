@@ -1,7 +1,5 @@
 # shardus-quic-net
 
-## Description
-
 A library for sending and receiving JSON messages over raw TCP sockets.
 
 Fundamentally, this is just a networked event emitter. Under the hood, the library is using a UUID system to correlate messages to their response handler in order to facilitate the simulation of a request/response system. Hence, the library can only be used to send data to and from other servers using this library (for now).
