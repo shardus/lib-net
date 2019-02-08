@@ -135,7 +135,7 @@ const listen = async (port, address, handleData) => {
 const stopListening = async (server) => {
   return new Promise((resolve, reject) => {
     for (const socket of Object.values(_socketMap)) {
-      socket.close()
+      socket.end()
     }
     server.close(e => {
       if (e) return reject(e)
