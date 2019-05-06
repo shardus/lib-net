@@ -13,12 +13,12 @@ const _fetchSocket = (port, address, errHandler) => {
     const socket = new net.Socket()
     socket.connect(port, address)
     socket.on('error', errHandler)
-    const destroySocket = (socket) => {
-      socket.destroy()
+    const destroySocket = () => {
+      this.destroy()
       delete _socketMap[host]
     }
-    socket.on('end', () => destroySocket(this))
-    socket.on('close', () => destroySocket(this))
+    socket.on('end', () => destroySocket().bind(this))
+    socket.on('close', () => destroySocket().bind(this))
     // TODO: Implement handling data on client side and passing it back up to higher level data handler
     // socket.on('data', data => {})
     _socketMap[host] = socket
