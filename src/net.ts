@@ -1,14 +1,32 @@
-const net = require('net')
+import * as net from 'net'
+
+export type Address = string
+
+export type Port = number
+
+// Host = `${Address}:${Port}`
+export type Host = string
+
+export interface RemoteSender {
+  address?: string
+  port?: number
+}
+
+export type LowLevelListener = (
+  augDataStr: string,
+  remote: RemoteSender
+) => void
 
 // Map of port and address to the socket for this IP
 // Format: ${address}:${port}
-const _socketMap = {}
+const _socketMap: { [host: string]: net.Socket } = {}
 
-const _fetchSocket = (port, address, errHandler) => {
-  if (!address || !port) {
-    throw Error('No address or port given for request.')
-  }
-  const host = `${address}:${port}`
+function _fetchSocket(
+  port: Port,
+  address: Address,
+  errHandler: { (err: Error): void }
+) {
+  const host: Host = `${address}:${port}`
   if (!_socketMap[host]) {
     const socket = new net.Socket()
     socket.connect(port, address)
@@ -26,13 +44,17 @@ const _fetchSocket = (port, address, errHandler) => {
   return _socketMap[host]
 }
 
-const send = async (port, address, dataString) => {
+export function send(
+  port: Port,
+  address: Address,
+  dataString: string
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const socket = _fetchSocket(port, address, reject)
     let msgBuffer = Buffer.from(dataString)
     const msgLength = msgBuffer.length
     const msgLengthBytes = Buffer.allocUnsafe(4)
-    msgLengthBytes.writeUInt32BE(msgLength)
+    msgLengthBytes.writeUInt32BE(msgLength, 0)
     msgBuffer = Buffer.concat([msgLengthBytes, msgBuffer])
     socket.write(msgBuffer, () => {
       resolve()
@@ -40,21 +62,24 @@ const send = async (port, address, dataString) => {
   })
 }
 
-const listen = async (port, address, handleData) => {
+export async function listen(
+  port: Port,
+  address: Address,
+  handleData: LowLevelListener
+) {
   return new Promise((resolve, reject) => {
     // This will get called on every incoming connection/message
-    const onNewSocket = socket => {
+    const onNewSocket = (socket: net.Socket) => {
       socket.on('error', reject)
 
-      let streamBuffer
-      let msgBuffer
+      let streamBuffer: Buffer
+      let msgBuffer: Buffer | null
       let msgLength = 0
       let newMsg = true
 
-      const readNBytes = (targetBuffer, n) => {
+      const readNBytes = (targetBuffer: Buffer, n: number) => {
         // Check if we have enough bytes in the stream buffer to actually read n bytes
         if (n > streamBuffer.length) {
-          // throw new Error(`Unable to read ${n} bytes. Stream buffer only contains ${streamBuffer.length} bytes.`)
           return false
         }
 
@@ -75,10 +100,15 @@ const listen = async (port, address, handleData) => {
 
       const finishMessage = () => {
         const remote = {
+          address: socket.remoteAddress,
           port: socket.remotePort,
-          address: socket.remoteAddress
         }
         // TODO: Give handleData a socket handle so we can write back to the server if we choose to do so
+        if (!msgBuffer) {
+          throw new Error(
+            'Failed to finishMessage: msgBuffer became falsy before converting to string'
+          )
+        }
         handleData(msgBuffer.toString(), remote)
         newMsg = true
         msgBuffer = null
@@ -91,29 +121,29 @@ const listen = async (port, address, handleData) => {
           return
         }
         if (newMsg) {
-          try {
-            let msgLengthBytes = Buffer.allocUnsafe(4)
-            const read = readNBytes(msgLengthBytes, 4)
-            if (!read) throw new Error('Unable to read message length while parsing stream.')
-            msgLength = msgLengthBytes.readUInt32BE(0)
-          } catch (e) {
-            throw e
+          const msgLengthBytes = Buffer.allocUnsafe(4)
+          const read = readNBytes(msgLengthBytes, 4)
+          if (!read) {
+            throw new Error(
+              'Unable to read message length while parsing stream.'
+            )
           }
+          msgLength = msgLengthBytes.readUInt32BE(0)
           newMsg = false
         }
         if (!msgBuffer) {
           msgBuffer = Buffer.allocUnsafe(msgLength)
         }
-        try {
-          const read = readNBytes(msgBuffer, msgLength)
-          if (!read) return
-        } catch (e) {
-          throw e
+        const read = readNBytes(msgBuffer, msgLength)
+        if (!read) {
+          throw new Error(
+            'Failed to read ${msgLength} bytes from streamBuffer into msgBuffer'
+          )
         }
         finishMessage()
       }
 
-      socket.on('data', data => {
+      socket.on('data', (data: Buffer) => {
         if (!streamBuffer) streamBuffer = data
         else streamBuffer = Buffer.concat([streamBuffer, data])
         try {
@@ -127,21 +157,22 @@ const listen = async (port, address, handleData) => {
 
     const server = net.createServer()
 
-    server.listen(port, address, e => {
-      if (e) return reject(e)
-      else return resolve(server)
-    })
-
     server.on('connection', onNewSocket)
+    server.on('listening', () => resolve(server))
+    server.on('error', reject)
+
+    server.listen(port, address)
   })
 }
 
-const stopListening = async (server) => {
+export async function stopListening(server: {
+  close: (arg0: (e: any) => void) => void
+}) {
   return new Promise((resolve, reject) => {
     for (const socket of Object.values(_socketMap)) {
       socket.end()
     }
-    server.close(e => {
+    server.close((e: any) => {
       if (e) return reject(e)
       else return resolve()
     })

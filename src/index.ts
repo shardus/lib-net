@@ -1,9 +1,26 @@
-const uuid = require('uuid/v1')
+import * as uuid from 'uuid/v1'
+import * as net from './net'
 
-const net = require('./net')
-const optsHelper = require('./opts')
+import optsHelper = require('./opts')
 
 const DEFAULT_ADDRESS = '0.0.0.0'
+
+export interface AugmentedData {
+  data: unknown
+  UUID: string
+  PORT: net.Port
+  ADDRESS: net.Address
+}
+
+export type ResponseCallback = (data?: unknown) => void
+
+export type TimeoutCallback = () => void
+
+export type ListenCallback = (
+  data: unknown,
+  remote: net.RemoteSender,
+  respond: ResponseCallback
+) => void
 
 const noop = () => {}
 
@@ -16,19 +33,26 @@ const noop = () => {}
 // the `send` function can augment its sent data with the port the `listen`
 // function will be listening on. This is necessary to simulate "responding"
 // to a "request".
-const generateContext = (opts) => {
+export const createNetwork = (opts: { port: number; address: string }) => {
   optsHelper.validate(opts)
 
   const PORT = opts.port
   const ADDRESS = opts.address || DEFAULT_ADDRESS
 
   // we're going to keep track of response IDs here
-  let responseUUIDMapping = {}
+  const responseUUIDMapping: { [uuid: string]: (data: unknown) => void } = {}
 
-  const _sendAug = async (port, address, augData, timeout, onResponse, onTimeout) => {
+  const _sendAug = async (
+    port: number,
+    address: string,
+    augData: AugmentedData,
+    timeout: number,
+    onResponse: ResponseCallback,
+    onTimeout: TimeoutCallback
+  ) => {
     const stringifiedData = JSON.stringify(augData)
 
-    let promise = net.send(port, address, stringifiedData)
+    const promise = net.send(port, address, stringifiedData)
 
     // a timeout of 0 means no return message is expected.
     if (timeout !== 0) {
@@ -37,50 +61,61 @@ const generateContext = (opts) => {
         onTimeout()
       }, timeout)
 
-      responseUUIDMapping[augData.UUID] = (...args) => {
+      responseUUIDMapping[augData.UUID] = (data: unknown) => {
         clearTimeout(timer)
-        onResponse(...args)
+        onResponse(data)
       }
     }
     return promise
   }
 
-  const send = async (port, address, data, timeout = 0, onResponse = noop, onTimeout = noop) => {
+  const send = async (
+    port: number,
+    address: string,
+    data: unknown,
+    timeout = 0,
+    onResponse: ResponseCallback = noop,
+    onTimeout: TimeoutCallback = noop
+  ) => {
     const UUID = uuid()
 
-    // Under the hood, snq needs to pass around some extra data for its own internal usage.
-    const augData = {
-      data: data, // the user's data
-      UUID: UUID, // the ID we'll use to determine whether requests were "responded to"
-      PORT: PORT, // the listening port,    so the library knows to whom to send "responses" to
-      ADDRESS: ADDRESS // the listening address, although the library will use the address it got from the network
+    // Under the hood, sn needs to pass around some extra data for its own internal usage.
+    const augData: AugmentedData = {
+      data, // the user's data
+      UUID, // the ID we'll use to determine whether requests were "responded to"
+      PORT, // the listening port,    so the library knows to whom to send "responses" to
+      ADDRESS, // the listening address, although the library will use the address it got from the network
     }
 
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
 
-  const listen = async (handleData) => {
+  const listen = async (handleData: (data: unknown) => void) => {
     // This is a wrapped form of the 'handleData' callback the user supplied.
     // Its job is to determine if the incoming data is a response to a request
     // the user sent. It does this by referencing the UUID map object.
-    const extractUUIDHandleData = (augData, remote) => {
-      augData = JSON.parse(augData)
+    const extractUUIDHandleData = (
+      augDataStr: string,
+      remote: RemoteSender
+    ) => {
+      // [TODO] Secure this with validation
+      const augData: AugmentedData = JSON.parse(augDataStr)
 
       const { PORT, UUID, data } = augData
       const address = remote.address
 
       // This is the return send function. A user will call this if they want
       // to "reply" or "respond" to an incoming message.
-      const respond = (response) => {
+      const respond: ResponseCallback = (response: unknown) => {
         const sendData = { data: response, UUID, PORT }
         return _sendAug(PORT, address, sendData, 0, noop, noop)
       }
 
       // If we are expecting a response, go through the respond mechanism.
       // Otherwise, it's a normal incoming message.
-      let handle
-      if (responseUUIDMapping[UUID]) handle = responseUUIDMapping[UUID]
-      else handle = handleData
+      const handle = responseUUIDMapping[UUID]
+        ? responseUUIDMapping[UUID]
+        : handleData
 
       // Clear the respond mechanism.
       delete responseUUIDMapping[UUID]
@@ -95,7 +130,7 @@ const generateContext = (opts) => {
     return server
   }
 
-  const stopListening = (server) => {
+  const stopListening = (server: any) => {
     return net.stopListening(server)
   }
 
@@ -103,5 +138,3 @@ const generateContext = (opts) => {
 
   return returnVal
 }
-
-module.exports = generateContext

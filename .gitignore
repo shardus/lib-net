@@ -81,3 +81,9 @@ instances/
 
 # package-lock.json
 package-lock.json 
+
+# VSCode settings
+.vscode
+
+# Built js file from ts src
+build/
