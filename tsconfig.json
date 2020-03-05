@@ -3,8 +3,11 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "build",
-    "allowJs": true,
-    "noEmitOnError": false
+    "noEmitOnError": false,
+    "noImplicitAny": false
   },
-  "include": ["src/**/*.ts", "src/**/*.js", "test/**/*.ts", "test/**/*.js"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts"
+  ]
 }

@@ -1,7 +1,7 @@
 import * as uuid from 'uuid/v1'
 import * as net from './net'
 
-import optsHelper = require('./opts')
+import validate from './opts'
 
 const DEFAULT_ADDRESS = '0.0.0.0'
 
@@ -34,7 +34,7 @@ const noop = () => {}
 // function will be listening on. This is necessary to simulate "responding"
 // to a "request".
 export const createNetwork = (opts: { port: number; address: string }) => {
-  optsHelper.validate(opts)
+  validate(opts)
 
   const PORT = opts.port
   const ADDRESS = opts.address || DEFAULT_ADDRESS
@@ -50,6 +50,7 @@ export const createNetwork = (opts: { port: number; address: string }) => {
     onResponse: ResponseCallback,
     onTimeout: TimeoutCallback
   ) => {
+
     const stringifiedData = JSON.stringify(augData)
 
     const promise = net.send(port, address, stringifiedData)

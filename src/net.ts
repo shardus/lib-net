@@ -179,4 +179,4 @@ export async function stopListening(server: {
   })
 }
 
-module.exports = { listen, send, stopListening }
+export default { listen, send, stopListening }
