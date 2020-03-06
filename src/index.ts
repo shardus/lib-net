@@ -37,7 +37,7 @@ const noop = () => {}
 // the `send` function can augment its sent data with the port the `listen`
 // function will be listening on. This is necessary to simulate "responding"
 // to a "request".
-const Sn = (opts: { port: number; address: string }) => {
+export const Sn = (opts: { port: number; address: string }) => {
   validate(opts)
 
   const PORT = opts.port
@@ -144,5 +144,3 @@ const Sn = (opts: { port: number; address: string }) => {
 
   return returnVal
 }
-
-export default Sn

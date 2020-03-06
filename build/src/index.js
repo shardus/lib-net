@@ -14,7 +14,7 @@ const noop = () => { };
 // the `send` function can augment its sent data with the port the `listen`
 // function will be listening on. This is necessary to simulate "responding"
 // to a "request".
-const Sn = (opts) => {
+exports.Sn = (opts) => {
     opts_1.default(opts);
     const PORT = opts.port;
     const ADDRESS = opts.address || DEFAULT_ADDRESS;
@@ -83,5 +83,4 @@ const Sn = (opts) => {
     const returnVal = { send, listen, stopListening };
     return returnVal;
 };
-exports.default = Sn;
 //# sourceMappingURL=index.js.map
