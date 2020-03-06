@@ -12,7 +12,7 @@ export interface RemoteSender {
 export declare type ResponseCallback = (data?: unknown) => void;
 export declare type TimeoutCallback = () => void;
 export declare type ListenCallback = (data: unknown, remote: net.RemoteSender, respond: ResponseCallback) => void;
-export declare const createNetwork: (opts: {
+declare const Sn: (opts: {
     port: number;
     address: string;
 }) => {
@@ -20,3 +20,4 @@ export declare const createNetwork: (opts: {
     listen: (handleData: (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void) => Promise<unknown>;
     stopListening: (server: any) => Promise<unknown>;
 };
+export default Sn;

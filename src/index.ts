@@ -1,6 +1,5 @@
 import * as uuid from 'uuid/v1'
 import * as net from './net'
-
 import validate from './opts'
 
 const DEFAULT_ADDRESS = '0.0.0.0'
@@ -38,7 +37,7 @@ const noop = () => {}
 // the `send` function can augment its sent data with the port the `listen`
 // function will be listening on. This is necessary to simulate "responding"
 // to a "request".
-export const createNetwork = (opts: { port: number; address: string }) => {
+const Sn = (opts: { port: number; address: string }) => {
   validate(opts)
 
   const PORT = opts.port
@@ -145,3 +144,5 @@ export const createNetwork = (opts: { port: number; address: string }) => {
 
   return returnVal
 }
+
+export default Sn
