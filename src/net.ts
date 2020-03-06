@@ -8,8 +8,8 @@ export type Port = number
 export type Host = string
 
 export interface RemoteSender {
-  address?: string
-  port?: number
+  address: string | undefined
+  port: number | undefined
 }
 
 export type LowLevelListener = (

@@ -9,7 +9,12 @@ export interface AugmentedData {
   data: unknown
   UUID: string
   PORT: net.Port
-  ADDRESS: net.Address
+  ADDRESS?: net.Address
+}
+
+export interface RemoteSender {
+  port: number | undefined
+  address: string | undefined
 }
 
 export type ResponseCallback = (data?: unknown) => void
@@ -91,7 +96,7 @@ export const createNetwork = (opts: { port: number; address: string }) => {
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
 
-  const listen = async (handleData: (data: unknown) => void) => {
+  const listen = async (handleData: (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void) => {
     // This is a wrapped form of the 'handleData' callback the user supplied.
     // Its job is to determine if the incoming data is a response to a request
     // the user sent. It does this by referencing the UUID map object.
@@ -109,6 +114,7 @@ export const createNetwork = (opts: { port: number; address: string }) => {
       // to "reply" or "respond" to an incoming message.
       const respond: ResponseCallback = (response: unknown) => {
         const sendData = { data: response, UUID, PORT }
+        //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)
         return _sendAug(PORT, address, sendData, 0, noop, noop)
       }
 

@@ -1,11 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const net = require("net");
+// Map of port and address to the socket for this IP
+// Format: ${address}:${port}
 const _socketMap = {};
-const _fetchSocket = (port, address, errHandler) => {
-    if (!address || !port) {
-        throw Error('No address or port given for request.');
-    }
+function _fetchSocket(port, address, errHandler) {
     const host = `${address}:${port}`;
     if (!_socketMap[host]) {
         const socket = new net.Socket();
@@ -22,8 +21,8 @@ const _fetchSocket = (port, address, errHandler) => {
         _socketMap[host] = socket;
     }
     return _socketMap[host];
-};
-const send = async (port, address, dataString) => {
+}
+function send(port, address, dataString) {
     return new Promise((resolve, reject) => {
         const socket = _fetchSocket(port, address, reject);
         let msgBuffer = Buffer.from(dataString);
@@ -35,8 +34,9 @@ const send = async (port, address, dataString) => {
             resolve();
         });
     });
-};
-const listen = async (port, address, handleData) => {
+}
+exports.send = send;
+async function listen(port, address, handleData) {
     return new Promise((resolve, reject) => {
         // This will get called on every incoming connection/message
         const onNewSocket = (socket) => {
@@ -48,7 +48,6 @@ const listen = async (port, address, handleData) => {
             const readNBytes = (targetBuffer, n) => {
                 // Check if we have enough bytes in the stream buffer to actually read n bytes
                 if (n > streamBuffer.length) {
-                    // throw new Error(`Unable to read ${n} bytes. Stream buffer only contains ${streamBuffer.length} bytes.`)
                     return false;
                 }
                 // Copy n bytes into the target buffer
@@ -65,11 +64,13 @@ const listen = async (port, address, handleData) => {
             };
             const finishMessage = () => {
                 const remote = {
+                    address: socket.remoteAddress,
                     port: socket.remotePort,
-                    address: socket.remoteAddress
                 };
                 // TODO: Give handleData a socket handle so we can write back to the server if we choose to do so
-                //@ts-ignore FOR NOW
+                if (!msgBuffer) {
+                    throw new Error('Failed to finishMessage: msgBuffer became falsy before converting to string');
+                }
                 handleData(msgBuffer.toString(), remote);
                 newMsg = true;
                 msgBuffer = null;
@@ -81,32 +82,24 @@ const listen = async (port, address, handleData) => {
                     return;
                 }
                 if (newMsg) {
-                    try {
-                        let msgLengthBytes = Buffer.allocUnsafe(4);
-                        const read = readNBytes(msgLengthBytes, 4);
-                        if (!read)
-                            throw new Error('Unable to read message length while parsing stream.');
-                        msgLength = msgLengthBytes.readUInt32BE(0);
+                    const msgLengthBytes = Buffer.allocUnsafe(4);
+                    const read = readNBytes(msgLengthBytes, 4);
+                    if (!read) {
+                        throw new Error('Unable to read message length while parsing stream.');
                     }
-                    catch (e) {
-                        throw e;
-                    }
+                    msgLength = msgLengthBytes.readUInt32BE(0);
                     newMsg = false;
                 }
                 if (!msgBuffer) {
                     msgBuffer = Buffer.allocUnsafe(msgLength);
                 }
-                try {
-                    const read = readNBytes(msgBuffer, msgLength);
-                    if (!read)
-                        return;
-                }
-                catch (e) {
-                    throw e;
+                const read = readNBytes(msgBuffer, msgLength);
+                if (!read) {
+                    throw new Error('Failed to read ${msgLength} bytes from streamBuffer into msgBuffer');
                 }
                 finishMessage();
             };
-            socket.on('data', data => {
+            socket.on('data', (data) => {
                 if (!streamBuffer)
                     streamBuffer = data;
                 else
@@ -121,27 +114,26 @@ const listen = async (port, address, handleData) => {
             });
         };
         const server = net.createServer();
-        server.listen(port, address, e => {
-            if (e)
-                return reject(e);
-            else
-                return resolve(server);
-        });
         server.on('connection', onNewSocket);
+        server.on('listening', () => resolve(server));
+        server.on('error', reject);
+        server.listen(port, address);
     });
-};
-const stopListening = async (server) => {
+}
+exports.listen = listen;
+async function stopListening(server) {
     return new Promise((resolve, reject) => {
         for (const socket of Object.values(_socketMap)) {
             socket.end();
         }
-        server.close(e => {
+        server.close((e) => {
             if (e)
                 return reject(e);
             else
                 return resolve();
         });
     });
-};
+}
+exports.stopListening = stopListening;
 exports.default = { listen, send, stopListening };
 //# sourceMappingURL=net.js.map
