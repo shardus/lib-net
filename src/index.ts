@@ -37,7 +37,7 @@ const noop = () => {}
 // the `send` function can augment its sent data with the port the `listen`
 // function will be listening on. This is necessary to simulate "responding"
 // to a "request".
-export const Sn = (opts: { port: number; address: string }) => {
+export const Sn = (opts: { port: number; address?: string }) => {
   validate(opts)
 
   const PORT = opts.port
@@ -54,7 +54,6 @@ export const Sn = (opts: { port: number; address: string }) => {
     onResponse: ResponseCallback,
     onTimeout: TimeoutCallback
   ) => {
-
     const stringifiedData = JSON.stringify(augData)
 
     const promise = net.send(port, address, stringifiedData)
@@ -95,7 +94,13 @@ export const Sn = (opts: { port: number; address: string }) => {
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
 
-  const listen = async (handleData: (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void) => {
+  const listen = async (
+    handleData: (
+      data: unknown,
+      remote: RemoteSender,
+      respond: ResponseCallback
+    ) => void
+  ) => {
     // This is a wrapped form of the 'handleData' callback the user supplied.
     // Its job is to determine if the incoming data is a response to a request
     // the user sent. It does this by referencing the UUID map object.
