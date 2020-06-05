@@ -135,11 +135,7 @@ export async function listen(
           msgBuffer = Buffer.allocUnsafe(msgLength)
         }
         const read = readNBytes(msgBuffer, msgLength)
-        if (!read) {
-          throw new Error(
-            'Failed to read ${msgLength} bytes from streamBuffer into msgBuffer'
-          )
-        }
+        if (!read)  return
         finishMessage()
       }
 
