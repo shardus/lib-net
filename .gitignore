@@ -79,9 +79,6 @@ db
 # Don't add test instances to repo
 instances/
 
-# package-lock.json
-package-lock.json 
-
 # VSCode settings
 .vscode
 
