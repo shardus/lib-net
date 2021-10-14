@@ -164,7 +164,7 @@ export async function listen(
 export async function stopListening(server: {
   close: (arg0: (e: any) => void) => void
 }) {
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     for (const socket of Object.values(_socketMap)) {
       socket.end()
     }
