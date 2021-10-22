@@ -84,3 +84,6 @@ instances/
 
 # Built js file from ts src
 build/
+
+# Rust build output
+/target
