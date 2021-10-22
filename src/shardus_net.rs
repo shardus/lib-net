@@ -1,10 +1,8 @@
-use once_cell::sync::Lazy;
 use std::net::{SocketAddr, ToSocketAddrs};
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
-use tokio::runtime::Runtime;
-
-static RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use super::runtime::RUNTIME;
 
 pub struct ShardusNet {
     address: SocketAddr,
@@ -17,19 +15,23 @@ impl ShardusNet {
         Ok(ShardusNet { address })
     }
 
-    pub fn listen(&self) {
-        Self::spawn_listener(self.address.clone());
+    pub fn listen(&self) -> UnboundedReceiver<String> {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        Self::spawn_listener(self.address.clone(), tx);
+        rx
     }
 
-    fn spawn_listener(address: SocketAddr) {
-        RUNTIME.spawn(Self::connect(address));
+    fn spawn_listener(address: SocketAddr, tx: UnboundedSender<String>) {
+        RUNTIME.spawn(Self::connect(address, tx));
     }
 
-    async fn connect(address: SocketAddr) {
+    async fn connect(address: SocketAddr, tx: UnboundedSender<String>) {
+        // @TODO: Clean up all of the unwraps;
         let listener = TcpListener::bind(address).await.unwrap();
 
         loop {
             let (mut socket, _) = listener.accept().await.expect("Failed to connect");
+            let tx = tx.clone();
 
             RUNTIME.spawn(async move {
                 let msg_len = socket.read_u32().await.unwrap() as usize;
@@ -37,7 +39,7 @@ impl ShardusNet {
                 buffer.resize(msg_len, 0);
                 socket.read_exact(&mut buffer).await.unwrap();
                 let msg = String::from_utf8(buffer).unwrap();
-                println!("Message Received: {:?}", msg);
+                tx.send(msg).unwrap();
             });
         }
     }

@@ -1,7 +1,11 @@
+use std::sync::Arc;
+
 use neon::{prelude::*, result::Throw};
 
+mod runtime;
 mod shardus_net;
 
+use runtime::RUNTIME;
 use shardus_net::ShardusNet;
 
 const DEFAULT_ADDRESS: &str = "0.0.0.0";
@@ -18,28 +22,45 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     shardus_net.set(cx, "_inner", shardus_net_inner)?;
     shardus_net.set(cx, "listen", listen)?;
 
-    // let callback = cx.argument::<JsFunction>(0)?.root(cx);
-    // let callback = callback.into_inner(cx);
-    // let this = cx.undefined();
-    // let args = iter::empty::<Handle<JsValue>>();
-
-    // callback.call(cx, this, args)?;
-
     Ok(shardus_net)
 }
 
 fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
-    let shardus_net = cx.this();
-    let shardus_net = shardus_net.get(cx, "_inner")?;
-    let shardus_net = shardus_net.downcast_or_throw::<JsBox<ShardusNet>, _>(cx)?;
+    let callback = cx.argument::<JsFunction>(0)?.root(cx);
+    let shardus_net = cx
+        .this()
+        .get(cx, "_inner")?
+        .downcast_or_throw::<JsBox<Arc<ShardusNet>>, _>(cx)?;
 
-    shardus_net.listen();
+    let shardus_net = (**shardus_net).clone();
+    let channel = cx.channel();
+
+    RUNTIME.spawn(async move {
+        let mut rx = shardus_net.listen();
+        let callback = Arc::new(callback);
+
+        if let Some(msg) = rx.recv().await {
+            let callback = callback.clone();
+
+            RUNTIME.spawn_blocking(move || {
+                channel.send(move |mut cx| {
+                    let cx = &mut cx;
+                    let this = cx.undefined();
+                    let args = [cx.string(msg)];
+
+                    callback.to_inner(cx).call(cx, this, args)?;
+
+                    Ok(())
+                });
+            });
+        }
+    });
 
     Ok(cx.undefined())
 }
 
-fn create_shardus_net_inner(cx: &mut FunctionContext) -> Result<ShardusNet, Throw> {
+fn create_shardus_net_inner(cx: &mut FunctionContext) -> Result<Arc<ShardusNet>, Throw> {
     let opts = cx.argument::<JsObject>(0)?;
 
     let port = opts
@@ -61,8 +82,8 @@ fn create_shardus_net_inner(cx: &mut FunctionContext) -> Result<ShardusNet, Thro
     let shardus_net = ShardusNet::new(address);
 
     match shardus_net {
-        Ok(address) => Ok(address),
-        Err(_) => cx.throw_type_error("The provided address is not valid")?
+        Ok(net) => Ok(Arc::new(net)),
+        Err(_) => cx.throw_type_error("The provided address is not valid")?,
     }
 }
 

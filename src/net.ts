@@ -29,6 +29,7 @@ function _fetchSocket(
   const host: Host = `${address}:${port}`
   if (!_socketMap[host]) {
     const socket = new net.Socket()
+    console.log("connecting to socket", socket);
     socket.connect(port, address)
     socket.on('error', errHandler)
     const destroySocket = () => {

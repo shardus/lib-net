@@ -13,7 +13,7 @@ const sn = Sn.Sn({
 
 const main = async () => {
   await sn.listen((data) => {
-    console.log(data.payload.length)
+      console.log("Received: ", data.len())
   })
 }
 
