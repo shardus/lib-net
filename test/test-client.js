@@ -8,7 +8,7 @@ const target = {
 }
 
 const main = async () => {
-  const longMsg = '0'.repeat(100000);
+  const longMsg = (Math.floor(Math.random() * 100) + "").repeat(100000);
   const promises = []
   for (let i = 0; i < 1000; i++) {
     promises.push(net.send(target.port, target.address, longMsg))

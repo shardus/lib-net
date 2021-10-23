@@ -40,8 +40,9 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let mut rx = shardus_net.listen();
         let callback = Arc::new(callback);
 
-        if let Some(msg) = rx.recv().await {
+        while let Some(msg) = rx.recv().await {
             let callback = callback.clone();
+            let channel = channel.clone();
 
             RUNTIME.spawn_blocking(move || {
                 channel.send(move |mut cx| {
