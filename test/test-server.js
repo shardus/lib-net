@@ -1,5 +1,4 @@
 const Sn = require('../.')
-const net = require('../build/src/net')
 
 const address = '127.0.0.1'
 const port = 5001

@@ -1,26 +1,33 @@
-use std::sync::Arc;
+use std::{net::ToSocketAddrs, sync::Arc};
 
 use neon::{prelude::*, result::Throw};
 
 mod runtime;
-mod shardus_net;
+mod shardus_net_listener;
+mod shardus_net_sender;
 
 use runtime::RUNTIME;
-use shardus_net::ShardusNet;
+use shardus_net_listener::ShardusNetListener;
+use shardus_net_sender::ShardusNetSender;
 
 const DEFAULT_ADDRESS: &str = "0.0.0.0";
 
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
-    let shardus_net_inner = create_shardus_net_inner(cx)?;
-    let shardus_net_inner = cx.boxed(shardus_net_inner);
+    let shardus_net_listener = create_shardus_net_listener(cx)?;
+    let shardus_net_sender = create_shardus_net_sender();
+    let shardus_net_listener = cx.boxed(shardus_net_listener);
+    let shardus_net_sender = cx.boxed(shardus_net_sender);
 
     let shardus_net = cx.empty_object();
 
     let listen = JsFunction::new(cx, listen)?;
+    let send = JsFunction::new(cx, send)?;
 
-    shardus_net.set(cx, "_inner", shardus_net_inner)?;
+    shardus_net.set(cx, "_listener", shardus_net_listener)?;
+    shardus_net.set(cx, "_sender", shardus_net_sender)?;
     shardus_net.set(cx, "listen", listen)?;
+    shardus_net.set(cx, "send", send)?;
 
     Ok(shardus_net)
 }
@@ -28,16 +35,16 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
 fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
     let callback = cx.argument::<JsFunction>(0)?.root(cx);
-    let shardus_net = cx
+    let shardus_net_listener = cx
         .this()
-        .get(cx, "_inner")?
-        .downcast_or_throw::<JsBox<Arc<ShardusNet>>, _>(cx)?;
+        .get(cx, "_listener")?
+        .downcast_or_throw::<JsBox<Arc<ShardusNetListener>>, _>(cx)?;
 
-    let shardus_net = (**shardus_net).clone();
+    let shardus_net_listener = (**shardus_net_listener).clone();
     let channel = cx.channel();
 
     RUNTIME.spawn(async move {
-        let mut rx = shardus_net.listen();
+        let mut rx = shardus_net_listener.listen();
         let callback = Arc::new(callback);
 
         while let Some(msg) = rx.recv().await {
@@ -61,7 +68,28 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
-fn create_shardus_net_inner(cx: &mut FunctionContext) -> Result<Arc<ShardusNet>, Throw> {
+fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let cx = &mut cx;
+    let port = cx.argument::<JsNumber>(0)?.value(cx);
+    let host = cx.argument::<JsString>(1)?.value(cx);
+    let data = cx.argument::<JsString>(2)?.value(cx);
+    let shardus_net_sender = cx
+        .this()
+        .get(cx, "_sender")?
+        .downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
+
+    match (host, port as u16).to_socket_addrs() {
+        Ok(mut address) => {
+            let address = address.next().unwrap();
+            shardus_net_sender.send(address, data);
+
+            Ok(cx.undefined())
+        },
+        Err(_) => cx.throw_type_error("The provided address is not valid")
+    }
+}
+
+fn create_shardus_net_listener(cx: &mut FunctionContext) -> Result<Arc<ShardusNetListener>, Throw> {
     let opts = cx.argument::<JsObject>(0)?;
 
     let port = opts
@@ -80,7 +108,7 @@ fn create_shardus_net_inner(cx: &mut FunctionContext) -> Result<Arc<ShardusNet>,
     // @TODO: Verify that a javascript number properly converts here without loss.
     let address = (host, port as u16);
 
-    let shardus_net = ShardusNet::new(address);
+    let shardus_net = ShardusNetListener::new(address);
 
     match shardus_net {
         Ok(net) => Ok(Arc::new(net)),
@@ -88,7 +116,12 @@ fn create_shardus_net_inner(cx: &mut FunctionContext) -> Result<Arc<ShardusNet>,
     }
 }
 
-impl Finalize for ShardusNet {}
+fn create_shardus_net_sender() -> Arc<ShardusNetSender> {
+    Arc::new(ShardusNetSender::new())
+}
+
+impl Finalize for ShardusNetListener {}
+impl Finalize for ShardusNetSender {}
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
