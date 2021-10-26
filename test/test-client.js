@@ -1,4 +1,4 @@
-const Sn = require('../.')
+const { Sn } = require('../.')
 const receipt = require('./applie_receipt.json')
 
 const address = '127.0.0.1'
@@ -8,7 +8,7 @@ const target = {
   port: 5001
 }
 
-const sn = Sn.Sn(target)
+const sn = Sn(target)
 
 const main = async () => {
   const data = JSON.stringify(receipt);

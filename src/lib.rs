@@ -80,7 +80,7 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
     match (host, port as u16).to_socket_addrs() {
         Ok(mut address) => {
-            let address = address.next().unwrap();
+            let address = address.next().expect("Expected at least one address");
             shardus_net_sender.send(address, data);
 
             Ok(cx.undefined())

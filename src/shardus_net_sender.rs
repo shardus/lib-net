@@ -20,7 +20,7 @@ impl ShardusNetSender {
     }
 
     pub fn send(&self, address: SocketAddr, data: String) {
-        self.send_channel.send((address, data)).unwrap()
+        self.send_channel.send((address, data)).expect("Failed to send data to channel");
     }
 
     fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, String)>) {
@@ -29,6 +29,7 @@ impl ShardusNetSender {
             let mut send_channel_rx = send_channel_rx;
 
             while let Some((address, data)) = send_channel_rx.recv().await {
+                // @TODO: Spawn tasks and lock per connection. Otherwise all outbound traffic is sync.
                 if let Some(connection) = connections.get(&address) {
                     connection.send(&data).await;
                 } else {
@@ -58,12 +59,12 @@ impl Connection {
     async fn send(&self, data: &str) -> () {
         let mut socket = self
             .socket
-            .get_or_init(|| async { Mutex::new(TcpStream::connect(self.address).await.unwrap()) })
+            .get_or_init(|| async { Mutex::new(TcpStream::connect(self.address).await.expect("Failed to connect to socket")) })
             .await
             .lock()
             .await;
 
-        socket.write_u32(data.len() as u32).await.unwrap();
-        socket.write_all(data.as_bytes()).await.unwrap();
+        socket.write_u32(data.len() as u32).await.expect("Failed to send buffer length");
+        socket.write_all(data.as_bytes()).await.expect("Failed to send buffer data");
     }
 }

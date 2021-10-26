@@ -87,3 +87,4 @@ build/
 
 # Rust build output
 /target
+*.node

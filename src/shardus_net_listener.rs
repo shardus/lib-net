@@ -28,7 +28,7 @@ impl ShardusNetListener {
 
     async fn receive(address: SocketAddr, tx: UnboundedSender<String>) {
         // @TODO: Clean up all of the unwraps;
-        let listener = TcpListener::bind(address).await.unwrap();
+        let listener = TcpListener::bind(address).await.expect("Failed to listen to port");
 
         loop {
             let (mut socket, _) = listener.accept().await.expect("Failed to connect");
@@ -46,9 +46,9 @@ impl ShardusNetListener {
                     // 2. We are calling read_exact which will fill the full length of the array.
                     unsafe { buffer.set_len(msg_len); }
 
-                    socket.read_exact(&mut buffer).await.unwrap();
-                    let msg = String::from_utf8(buffer).unwrap();
-                    tx.send(msg).unwrap();
+                    socket.read_exact(&mut buffer).await.expect("Failed to read data");
+                    let msg = String::from_utf8(buffer).expect("Failed to convert data to utf8");
+                    tx.send(msg).expect("Failed to send message to transmitter");
                 }
             });
         }
