@@ -4,9 +4,6 @@
   "description": "",
   "main": "build/src/index.js",
   "types": "build/src/index.d.ts",
-  "files": [
-    "src/**/*"
-  ],
   "scripts": {
     "build": "npm run build-rust-release && npm run build-node",
     "build-node": "tsc -p .",
