@@ -11,8 +11,6 @@ use shardus_net_listener::ShardusNetListener;
 use shardus_net_sender::ShardusNetSender;
 use tokio::sync::oneshot;
 
-const DEFAULT_ADDRESS: &str = "0.0.0.0";
-
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
     let shardus_net_listener = create_shardus_net_listener(cx)?;
@@ -116,20 +114,8 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 fn create_shardus_net_listener(cx: &mut FunctionContext) -> Result<Arc<ShardusNetListener>, Throw> {
-    let opts = cx.argument::<JsObject>(0)?;
-
-    let port = opts
-        .get(cx, "port")?
-        .downcast_or_throw::<JsNumber, _>(cx)?
-        .value(cx);
-
-    let host = opts
-        .get(cx, "address")
-        .ok()
-        .map(|v| v.downcast_or_throw::<JsString, _>(cx))
-        .transpose()?
-        .map(|v| v.value(cx))
-        .unwrap_or_else(|| DEFAULT_ADDRESS.to_string());
+    let port = cx.argument::<JsNumber>(0)?.value(cx);
+    let host = cx.argument::<JsString>(1)?.value(cx);
 
     // @TODO: Verify that a javascript number properly converts here without loss.
     let address = (host, port as u16);

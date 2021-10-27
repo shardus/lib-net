@@ -52,7 +52,7 @@ export const Sn = (opts: { port: number; address?: string }) => {
   const PORT = opts.port
   const ADDRESS = opts.address || DEFAULT_ADDRESS
 
-  const _net = net.Sn(opts);
+  const _net = net.Sn(PORT, ADDRESS);
 
   // we're going to keep track of response IDs here
   const responseUUIDMapping: { [uuid: string]: (data: unknown) => void } = {}
