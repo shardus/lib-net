@@ -15,7 +15,7 @@
     "build-rust": "cargo-cp-artifact -nc shardus-net.node -- cargo build --message-format=json-render-diagnostics",
     "build-rust-debug": "npm run build-rust --",
     "build-rust-release": "npm run build-rust -- --release",
-    "prepare": "npm run b",
+    "prepare": "npm run build",
     "test": "cargo test"
   },
   "repository": {
