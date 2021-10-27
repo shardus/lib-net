@@ -14,10 +14,13 @@ const main = async () => {
   const data = JSON.stringify(receipt);
   const promises = []
   for (let i = 0; i < 1000; i++) {
-    promises.push(sn.send(target.port, target.address, data))
+    promises.push(sn.send(target.port, target.address, data, 1000, (response) => {
+      console.log("Responded with: ", response);
+    }))
   }
   console.log(promises)
   await Promise.all(promises)
+  console.log("Completed");
 }
 
 main()

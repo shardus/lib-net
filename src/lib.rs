@@ -9,6 +9,7 @@ mod shardus_net_sender;
 use runtime::RUNTIME;
 use shardus_net_listener::ShardusNetListener;
 use shardus_net_sender::ShardusNetSender;
+use tokio::sync::oneshot;
 
 const DEFAULT_ADDRESS: &str = "0.0.0.0";
 
@@ -47,7 +48,7 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let mut rx = shardus_net_listener.listen();
         let callback = Arc::new(callback);
 
-        while let Some(msg) = rx.recv().await {
+        while let Some((msg, remote_address)) = rx.recv().await {
             let callback = callback.clone();
             let channel = channel.clone();
 
@@ -55,7 +56,11 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 channel.send(move |mut cx| {
                     let cx = &mut cx;
                     let this = cx.undefined();
-                    let args = [cx.string(msg)];
+                    let message = cx.string(msg);
+                    let remote_ip = cx.string(remote_address.ip().to_string());
+                    let remote_port = cx.number(remote_address.port());
+                    let args: [Handle<JsValue>; 3] =
+                        [message.upcast(), remote_ip.upcast(), remote_port.upcast()];
 
                     callback.to_inner(cx).call(cx, this, args)?;
 
@@ -73,19 +78,40 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let port = cx.argument::<JsNumber>(0)?.value(cx);
     let host = cx.argument::<JsString>(1)?.value(cx);
     let data = cx.argument::<JsString>(2)?.value(cx);
+    let complete_cb = cx.argument::<JsFunction>(3)?.root(cx);
     let shardus_net_sender = cx
         .this()
         .get(cx, "_sender")?
         .downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
+    let channel = cx.channel();
+    let (complete_tx, complete_rx) = oneshot::channel::<()>();
+
+    RUNTIME.spawn(async move {
+        complete_rx
+            .await
+            .expect("Complete send tx dropped before notify");
+
+        RUNTIME.spawn_blocking(move || {
+            channel.send(move |mut cx| {
+                let cx = &mut cx;
+                let this = cx.undefined();
+                let args: [Handle<JsValue>; 0] = [];
+
+                complete_cb.to_inner(cx).call(cx, this, args)?;
+
+                Ok(())
+            });
+        });
+    });
 
     match (host, port as u16).to_socket_addrs() {
         Ok(mut address) => {
             let address = address.next().expect("Expected at least one address");
-            shardus_net_sender.send(address, data);
+            shardus_net_sender.send(address, data, complete_tx);
 
             Ok(cx.undefined())
-        },
-        Err(_) => cx.throw_type_error("The provided address is not valid")
+        }
+        Err(_) => cx.throw_type_error("The provided address is not valid"),
     }
 }
 
@@ -103,7 +129,7 @@ fn create_shardus_net_listener(cx: &mut FunctionContext) -> Result<Arc<ShardusNe
         .map(|v| v.downcast_or_throw::<JsString, _>(cx))
         .transpose()?
         .map(|v| v.value(cx))
-        .unwrap_or(DEFAULT_ADDRESS.to_string());
+        .unwrap_or_else(|| DEFAULT_ADDRESS.to_string());
 
     // @TODO: Verify that a javascript number properly converts here without loss.
     let address = (host, port as u16);

@@ -35,7 +35,7 @@ export type ListenCallback = (
   respond: ResponseCallback
 ) => void
 
-const noop = () => {}
+const noop = () => { }
 
 // We have to generate a closure so,
 // 1) We can test simulated from two isolated environments, and
@@ -67,21 +67,22 @@ export const Sn = (opts: { port: number; address?: string }) => {
   ) => {
     const stringifiedData = JSON.stringify(augData)
 
-    const promise = _net.send(port, address, stringifiedData)
+    return new Promise((resolve, reject) => {
+      _net.send(port, address, stringifiedData, resolve)
 
-    // a timeout of 0 means no return message is expected.
-    if (timeout !== 0) {
-      const timer = setTimeout(() => {
-        delete responseUUIDMapping[augData.UUID]
-        onTimeout()
-      }, timeout)
+      // a timeout of 0 means no return message is expected.
+      if (timeout !== 0) {
+        const timer = setTimeout(() => {
+          delete responseUUIDMapping[augData.UUID]
+          onTimeout()
+        }, timeout)
 
-      responseUUIDMapping[augData.UUID] = (data: unknown) => {
-        clearTimeout(timer)
-        onResponse(data)
+        responseUUIDMapping[augData.UUID] = (data: unknown) => {
+          clearTimeout(timer)
+          onResponse(data)
+        }
       }
-    }
-    return promise
+    })
   }
 
   const send = async (
@@ -127,8 +128,8 @@ export const Sn = (opts: { port: number; address?: string }) => {
 
       // This is the return send function. A user will call this if they want
       // to "reply" or "respond" to an incoming message.
-      const respond: ResponseCallback = (response: unknown) => {
-        const sendData = { data: response, UUID, PORT }
+      const respond: ResponseCallback = (data: unknown) => {
+        const sendData = { data, UUID, PORT }
         //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)
         return _sendAug(PORT, address, sendData, 0, noop, noop)
       }
@@ -148,8 +149,11 @@ export const Sn = (opts: { port: number; address?: string }) => {
     // TODO these should be spun up in parallel, but that convolutes code
     // and doesn't save hardly any startup time, so skipping for now.
     // const server = await _net.listen(PORT, ADDRESS, extractUUIDHandleData)
-    const server = await _net.listen((data) => {
-        extractUUIDHandleData(data)
+    const server = await _net.listen((data, remoteIp, remotePort) => {
+      extractUUIDHandleData(data, {
+        address: remoteIp,
+        port: remotePort
+      });
     })
 
     return server

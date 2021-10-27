@@ -1,37 +1,39 @@
+use super::runtime::RUNTIME;
 use std::net::{SocketAddr, ToSocketAddrs};
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
-use super::runtime::RUNTIME;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 pub struct ShardusNetListener {
-    address: SocketAddr
+    address: SocketAddr,
 }
 
 impl ShardusNetListener {
     pub fn new<A: ToSocketAddrs>(address: A) -> Result<Self, ()> {
         let mut addresses = address.to_socket_addrs().map_err(|_| ())?;
-        let address = addresses.next().ok_or_else(|| ())?;
+        let address = addresses.next().ok_or(())?;
 
         Ok(Self { address })
     }
 
-    pub fn listen(&self) -> UnboundedReceiver<String> {
-        Self::spawn_listener(self.address.clone())
+    pub fn listen(&self) -> UnboundedReceiver<(String, SocketAddr)> {
+        Self::spawn_listener(self.address)
     }
 
-    fn spawn_listener(address: SocketAddr) -> UnboundedReceiver<String> {
+    fn spawn_listener(address: SocketAddr) -> UnboundedReceiver<(String, SocketAddr)> {
         let (tx, rx) = unbounded_channel();
         RUNTIME.spawn(Self::receive(address, tx));
         rx
     }
 
-    async fn receive(address: SocketAddr, tx: UnboundedSender<String>) {
+    async fn receive(address: SocketAddr, tx: UnboundedSender<(String, SocketAddr)>) {
         // @TODO: Clean up all of the unwraps;
-        let listener = TcpListener::bind(address).await.expect("Failed to listen to port");
+        let listener = TcpListener::bind(address)
+            .await
+            .expect("Failed to listen to port");
 
         loop {
-            let (mut socket, _) = listener.accept().await.expect("Failed to connect");
+            let (mut socket, remote_addr) = listener.accept().await.expect("Failed to connect");
             let tx = tx.clone();
 
             RUNTIME.spawn(async move {
@@ -44,11 +46,18 @@ impl ShardusNetListener {
                     // SAFETY: We can set the length of the vec here since we know that:
                     // 1. The capacity has been set above and the length is <= capacity.
                     // 2. We are calling read_exact which will fill the full length of the array.
-                    unsafe { buffer.set_len(msg_len); }
+                    unsafe {
+                        buffer.set_len(msg_len);
+                    }
 
-                    socket.read_exact(&mut buffer).await.expect("Failed to read data");
+                    socket
+                        .read_exact(&mut buffer)
+                        .await
+                        .expect("Failed to read data");
+
                     let msg = String::from_utf8(buffer).expect("Failed to convert data to utf8");
-                    tx.send(msg).expect("Failed to send message to transmitter");
+                    tx.send((msg, remote_addr))
+                        .expect("Failed to send message to transmitter");
                 }
             });
         }

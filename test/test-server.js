@@ -11,8 +11,12 @@ const sn = Sn.Sn({
 // net.listen(port, address, (data) => console.log(data));
 
 const main = async () => {
-  await sn.listen((data) => {
-      console.log("Received: ", data.length)
+  await sn.listen((data, remote, respond) => {
+    console.log(`Received: ${data.length} from ${JSON.stringify(remote)}`);
+
+    if (!data.startsWith('Response')) {
+      respond("Response message");
+    }
   })
 }
 
