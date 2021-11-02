@@ -137,7 +137,8 @@ export const Sn = (opts: { port: number; address?: string }) => {
       const respond: ResponseCallback = (data: unknown) => {
         const sendData = { data, UUID, PORT }
         //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)
-        return _sendAug(PORT, address, sendData, 0, noop, noop)
+        // @TODO: This error should be properly propagated and logged.
+        return _sendAug(PORT, address, sendData, 0, noop, noop).catch(console.error)
       }
 
       // If we are expecting a response, go through the respond mechanism.
