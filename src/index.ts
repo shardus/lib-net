@@ -67,8 +67,14 @@ export const Sn = (opts: { port: number; address?: string }) => {
   ) => {
     const stringifiedData = JSON.stringify(augData)
 
-    return new Promise((resolve, reject) => {
-      _net.send(port, address, stringifiedData, resolve)
+    return new Promise<void>((resolve, reject) => {
+      _net.send(port, address, stringifiedData, (error) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      })
 
       // a timeout of 0 means no return message is expected.
       if (timeout !== 0) {

@@ -1,5 +1,6 @@
 use std::{net::ToSocketAddrs, sync::Arc};
 
+use log::LevelFilter;
 use neon::{prelude::*, result::Throw};
 
 mod runtime;
@@ -8,7 +9,8 @@ mod shardus_net_sender;
 
 use runtime::RUNTIME;
 use shardus_net_listener::ShardusNetListener;
-use shardus_net_sender::ShardusNetSender;
+use shardus_net_sender::{SendResult, ShardusNetSender};
+use simplelog::{Config, SimpleLogger};
 use tokio::sync::oneshot;
 
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
@@ -82,10 +84,10 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         .get(cx, "_sender")?
         .downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
     let channel = cx.channel();
-    let (complete_tx, complete_rx) = oneshot::channel::<()>();
+    let (complete_tx, complete_rx) = oneshot::channel::<SendResult>();
 
     RUNTIME.spawn(async move {
-        complete_rx
+        let result = complete_rx
             .await
             .expect("Complete send tx dropped before notify");
 
@@ -93,7 +95,12 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             channel.send(move |mut cx| {
                 let cx = &mut cx;
                 let this = cx.undefined();
-                let args: [Handle<JsValue>; 0] = [];
+                let mut args = Vec::new();
+
+                if let Err(err) = result {
+                    let error = cx.string(format!("{:?}", err));
+                    args.push(error);
+                }
 
                 complete_cb.to_inner(cx).call(cx, this, args)?;
 
@@ -137,6 +144,8 @@ impl Finalize for ShardusNetSender {}
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
+    SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
+
     cx.export_function("Sn", create_shardus_net)?;
 
     Ok(())
