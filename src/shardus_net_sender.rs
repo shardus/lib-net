@@ -3,6 +3,7 @@ use crate::oneshot::Sender;
 use log::{error, info};
 use std::collections::HashMap;
 
+use std::io;
 use std::net::SocketAddr;
 
 use std::sync::Arc;
@@ -37,9 +38,9 @@ impl ShardusNetSender {
     }
 
     pub fn send(&self, address: SocketAddr, data: String, complete_tx: Sender<SendResult>) {
-        self.send_channel.send((address, data, complete_tx)).expect(
-            "Unexpected! Failed to send data to channel. Sender task must have been dropped.",
-        );
+        self.send_channel
+            .send((address, data, complete_tx))
+            .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
     }
 
     fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, String, Sender<SendResult>)>) {
@@ -48,10 +49,7 @@ impl ShardusNetSender {
             let mut send_channel_rx = send_channel_rx;
 
             while let Some((address, data, complete_tx)) = send_channel_rx.recv().await {
-                let connection = connections
-                    .entry(address)
-                    .or_insert_with(|| Arc::new(Connection::new(address)))
-                    .clone();
+                let connection = connections.entry(address).or_insert_with(|| Arc::new(Connection::new(address))).clone();
 
                 RUNTIME.spawn(async move {
                     let result = connection.send(&data).await;
@@ -76,38 +74,61 @@ impl Connection {
         Self { address, socket }
     }
 
-    async fn send(&self, data: &str) -> Result<(), SenderError> {
+    async fn send(&self, data: &str) -> SendResult {
         let mut socket = self.socket.lock().await;
         let socket_op = &mut (*socket);
 
-        if socket_op.is_none() {
-            let connection_stream = TcpStream::connect(self.address).await;
+        let socket = Self::connect_and_set_socket_if_none(socket_op, self.address).await?;
 
-            match connection_stream {
-                Ok(connection_stream) => *socket_op = Some(connection_stream),
-                Err(error) => return Err(SenderError::ConnectionFailedError(error, self.address)),
+        let result = Self::write_data_to_stream(socket, data).await;
+
+        if result.is_err() {
+            info!("Failed to send data to {}. Attempting to reconnect and try again.", self.address);
+
+            // There was an error sending data. The connection might have been previously closed.
+            *socket_op = None;
+
+            // Since there was an error previously, try reconnecting to the socket and resending the data.
+            let socket = Self::connect_and_set_socket_if_none(socket_op, self.address).await?;
+            let result = Self::write_data_to_stream(socket, data).await;
+
+            // If there is still an error even after the retry, return as failure to send.
+            if let Err(error) = result {
+                return Err(SenderError::SendFailedError(error, self.address));
             }
         }
 
-        let socket = socket_op
-            .as_mut()
-            .expect("Unexpected! This socket has already been checked to exist.");
-
-        let len = data.len() as u32;
-        let result = socket.write_u32(len).await;
-
-        if let Err(error) = result {
-            *socket_op = None;
-            return Err(SenderError::SendFailedError(error, self.address));
-        }
-
-        let result = socket.write_all(data.as_bytes()).await;
-
-        if let Err(error) = result {
-            *socket_op = None;
-            return Err(SenderError::SendFailedError(error, self.address));
-        }
-
         Ok(())
+    }
+
+    async fn connect_and_set_socket_if_none(socket_op: &mut Option<TcpStream>, address: SocketAddr) -> Result<&mut TcpStream, SenderError> {
+        let was_socket_none = socket_op.is_none();
+
+        if was_socket_none {
+            let connection_stream = TcpStream::connect(address).await;
+
+            match connection_stream {
+                Ok(connection_stream) => *socket_op = Some(connection_stream),
+                Err(error) => return Err(SenderError::ConnectionFailedError(error, address)),
+            }
+        }
+
+        let socket = socket_op.as_mut().expect("Unexpected! This socket has already been checked to exist.");
+
+        Ok(socket)
+    }
+
+    async fn write_data_to_stream(socket: &mut TcpStream, data: &str) -> io::Result<()> {
+        let len = data.len() as u32;
+        socket.write_u32(len).await?;
+        socket.write_all(data.as_bytes()).await
+    }
+}
+
+impl Drop for Connection {
+    fn drop(&mut self) {
+        if let Some(stream) = self.socket.get_mut() {
+            RUNTIME.block_on(stream.shutdown()).ok();
+        }
     }
 }

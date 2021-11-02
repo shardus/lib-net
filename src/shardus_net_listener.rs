@@ -66,10 +66,7 @@ impl ShardusNetListener {
         }
     }
 
-    async fn accept_connections(
-        listener: TcpListener,
-        received_msg_tx: UnboundedSender<(String, SocketAddr)>,
-    ) -> std::io::Result<()> {
+    async fn accept_connections(listener: TcpListener, received_msg_tx: UnboundedSender<(String, SocketAddr)>) -> std::io::Result<()> {
         loop {
             let (socket, remote_addr) = listener.accept().await?;
             let received_msg_tx = received_msg_tx.clone();
@@ -77,10 +74,7 @@ impl ShardusNetListener {
             RUNTIME.spawn(async move {
                 let result = Self::receive(socket, remote_addr, received_msg_tx).await;
                 match result {
-                    Ok(_) => info!(
-                        "Connection safely completed and shutdown with {}",
-                        remote_addr
-                    ),
+                    Ok(_) => info!("Connection safely completed and shutdown with {}", remote_addr),
                     Err(err) => {
                         error!("Connection to {} failed with Error: {}", remote_addr, err)
                     }
@@ -89,11 +83,7 @@ impl ShardusNetListener {
         }
     }
 
-    async fn receive(
-        socket_stream: TcpStream,
-        remote_addr: SocketAddr,
-        received_msg_tx: UnboundedSender<(String, SocketAddr)>,
-    ) -> ListenerResult<()> {
+    async fn receive(socket_stream: TcpStream, remote_addr: SocketAddr, received_msg_tx: UnboundedSender<(String, SocketAddr)>) -> ListenerResult<()> {
         let mut socket_stream = socket_stream;
         while let Ok(msg_len) = socket_stream.read_u32().await {
             let msg_len = msg_len as usize;
@@ -111,9 +101,7 @@ impl ShardusNetListener {
             socket_stream.read_exact(&mut buffer).await?;
 
             let msg = String::from_utf8(buffer)?;
-            received_msg_tx
-                .send((msg, remote_addr))
-                .map_err(|_| SendError(()))?;
+            received_msg_tx.send((msg, remote_addr)).map_err(|_| SendError(()))?;
         }
 
         Ok(())

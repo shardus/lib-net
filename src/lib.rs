@@ -36,10 +36,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
 fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
     let callback = cx.argument::<JsFunction>(0)?.root(cx);
-    let shardus_net_listener = cx
-        .this()
-        .get(cx, "_listener")?
-        .downcast_or_throw::<JsBox<Arc<ShardusNetListener>>, _>(cx)?;
+    let shardus_net_listener = cx.this().get(cx, "_listener")?.downcast_or_throw::<JsBox<Arc<ShardusNetListener>>, _>(cx)?;
 
     let shardus_net_listener = (**shardus_net_listener).clone();
     let channel = cx.channel();
@@ -59,8 +56,7 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     let message = cx.string(msg);
                     let remote_ip = cx.string(remote_address.ip().to_string());
                     let remote_port = cx.number(remote_address.port());
-                    let args: [Handle<JsValue>; 3] =
-                        [message.upcast(), remote_ip.upcast(), remote_port.upcast()];
+                    let args: [Handle<JsValue>; 3] = [message.upcast(), remote_ip.upcast(), remote_port.upcast()];
 
                     callback.to_inner(cx).call(cx, this, args)?;
 
@@ -79,17 +75,12 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let host = cx.argument::<JsString>(1)?.value(cx);
     let data = cx.argument::<JsString>(2)?.value(cx);
     let complete_cb = cx.argument::<JsFunction>(3)?.root(cx);
-    let shardus_net_sender = cx
-        .this()
-        .get(cx, "_sender")?
-        .downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
+    let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
     let channel = cx.channel();
     let (complete_tx, complete_rx) = oneshot::channel::<SendResult>();
 
     RUNTIME.spawn(async move {
-        let result = complete_rx
-            .await
-            .expect("Complete send tx dropped before notify");
+        let result = complete_rx.await.expect("Complete send tx dropped before notify");
 
         RUNTIME.spawn_blocking(move || {
             channel.send(move |mut cx| {
