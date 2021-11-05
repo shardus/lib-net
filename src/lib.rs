@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::{net::ToSocketAddrs, sync::Arc};
+use std::time::Instant;
 
 use log::LevelFilter;
 use neon::{prelude::*, result::Throw};
@@ -6,29 +8,39 @@ use neon::{prelude::*, result::Throw};
 mod runtime;
 mod shardus_net_listener;
 mod shardus_net_sender;
+mod ring_buffer;
+mod stats;
 
 use runtime::RUNTIME;
 use shardus_net_listener::ShardusNetListener;
 use shardus_net_sender::{SendResult, ShardusNetSender};
 use simplelog::{Config, SimpleLogger};
 use tokio::sync::oneshot;
+use stats::{Incrementers, Stats};
 
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
     let shardus_net_listener = create_shardus_net_listener(cx)?;
     let shardus_net_sender = create_shardus_net_sender();
+    let (stats, stats_incrementers) = Stats::new();
     let shardus_net_listener = cx.boxed(shardus_net_listener);
     let shardus_net_sender = cx.boxed(shardus_net_sender);
+    let stats = cx.boxed(stats);
+    let stats_incrementers = cx.boxed(stats_incrementers);
 
     let shardus_net = cx.empty_object();
 
     let listen = JsFunction::new(cx, listen)?;
     let send = JsFunction::new(cx, send)?;
+    let get_stats = JsFunction::new(cx, get_stats)?;
 
     shardus_net.set(cx, "_listener", shardus_net_listener)?;
     shardus_net.set(cx, "_sender", shardus_net_sender)?;
+    shardus_net.set(cx, "_stats", stats)?;
+    shardus_net.set(cx, "_stats_incrementers", stats_incrementers)?;
     shardus_net.set(cx, "listen", listen)?;
     shardus_net.set(cx, "send", send)?;
+    shardus_net.set(cx, "stats", get_stats)?;
 
     Ok(shardus_net)
 }
@@ -37,6 +49,9 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
     let callback = cx.argument::<JsFunction>(0)?.root(cx);
     let shardus_net_listener = cx.this().get(cx, "_listener")?.downcast_or_throw::<JsBox<Arc<ShardusNetListener>>, _>(cx)?;
+    let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
+    let stats_incrementers = (**stats_incrementers).clone();
+    let this = cx.this().root(cx);
 
     let shardus_net_listener = (**shardus_net_listener).clone();
     let channel = cx.channel();
@@ -44,14 +59,27 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     RUNTIME.spawn(async move {
         let mut rx = shardus_net_listener.listen();
         let callback = Arc::new(callback);
+        let this = Arc::new(this);
 
         while let Some((msg, remote_address)) = rx.recv().await {
             let callback = callback.clone();
+            let this = this.clone();
             let channel = channel.clone();
 
+            stats_incrementers.increment_outstanding_receives();
+
             RUNTIME.spawn_blocking(move || {
+                let now = Instant::now();
                 channel.send(move |mut cx| {
                     let cx = &mut cx;
+
+                    let elapsed = now.elapsed();
+                    let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+                    let mut stats = (**stats).borrow_mut();
+
+                    stats.decrement_outstanding_receives();
+                    stats.put_elapsed_receive(elapsed);
+
                     let this = cx.undefined();
                     let message = cx.string(msg);
                     let remote_ip = cx.string(remote_address.ip().to_string());
@@ -76,8 +104,13 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let data = cx.argument::<JsString>(2)?.value(cx);
     let complete_cb = cx.argument::<JsFunction>(3)?.root(cx);
     let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
+    let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
+
+    let this = cx.this().root(cx);
     let channel = cx.channel();
     let (complete_tx, complete_rx) = oneshot::channel::<SendResult>();
+
+    stats_incrementers.increment_outstanding_sends();
 
     RUNTIME.spawn(async move {
         let result = complete_rx.await.expect("Complete send tx dropped before notify");
@@ -85,6 +118,9 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         RUNTIME.spawn_blocking(move || {
             channel.send(move |mut cx| {
                 let cx = &mut cx;
+                let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+                (**stats).borrow_mut().decrement_outstanding_sends();
+
                 let this = cx.undefined();
                 let mut args = Vec::new();
 
@@ -111,6 +147,15 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     }
 }
 
+fn get_stats(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let cx = &mut cx;
+    let stats = cx.this().get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+
+    // (**stats).borrow_mut().get_stats();
+
+    Ok(cx.undefined())
+}
+
 fn create_shardus_net_listener(cx: &mut FunctionContext) -> Result<Arc<ShardusNetListener>, Throw> {
     let port = cx.argument::<JsNumber>(0)?.value(cx);
     let host = cx.argument::<JsString>(1)?.value(cx);
@@ -132,6 +177,8 @@ fn create_shardus_net_sender() -> Arc<ShardusNetSender> {
 
 impl Finalize for ShardusNetListener {}
 impl Finalize for ShardusNetSender {}
+impl Finalize for Stats {}
+impl Finalize for Incrementers {}
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
