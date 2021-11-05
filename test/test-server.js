@@ -20,6 +20,8 @@ const main = async () => {
         respond("Response message");
       }
     }, RESPONSE_DELAY_MILLIS);
+
+    console.log(sn.stats());
   })
 }
 

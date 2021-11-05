@@ -1,22 +1,24 @@
 use std::cell::RefCell;
-use std::{net::ToSocketAddrs, sync::Arc};
+use std::time::Duration;
 use std::time::Instant;
+use std::{net::ToSocketAddrs, sync::Arc};
 
 use log::LevelFilter;
 use neon::{prelude::*, result::Throw};
 
+mod ring_buffer;
 mod runtime;
 mod shardus_net_listener;
 mod shardus_net_sender;
-mod ring_buffer;
 mod stats;
 
+use ring_buffer::Stats as RingBufferStats;
 use runtime::RUNTIME;
 use shardus_net_listener::ShardusNetListener;
 use shardus_net_sender::{SendResult, ShardusNetSender};
 use simplelog::{Config, SimpleLogger};
+use stats::{Incrementers, Stats, StatsResult};
 use tokio::sync::oneshot;
-use stats::{Incrementers, Stats};
 
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
@@ -25,7 +27,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let (stats, stats_incrementers) = Stats::new();
     let shardus_net_listener = cx.boxed(shardus_net_listener);
     let shardus_net_sender = cx.boxed(shardus_net_sender);
-    let stats = cx.boxed(stats);
+    let stats = cx.boxed(RefCell::new(stats));
     let stats_incrementers = cx.boxed(stats_incrementers);
 
     let shardus_net = cx.empty_object();
@@ -79,6 +81,8 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
                     stats.decrement_outstanding_receives();
                     stats.put_elapsed_receive(elapsed);
+
+                    drop(stats);
 
                     let this = cx.undefined();
                     let message = cx.string(msg);
@@ -147,13 +151,13 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     }
 }
 
-fn get_stats(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+fn get_stats(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
     let stats = cx.this().get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+    let stats = (**stats).borrow_mut().get_stats();
+    let stats = stats.to_object(cx)?;
 
-    // (**stats).borrow_mut().get_stats();
-
-    Ok(cx.undefined())
+    Ok(stats)
 }
 
 fn create_shardus_net_listener(cx: &mut FunctionContext) -> Result<Arc<ShardusNetListener>, Throw> {
@@ -179,6 +183,85 @@ impl Finalize for ShardusNetListener {}
 impl Finalize for ShardusNetSender {}
 impl Finalize for Stats {}
 impl Finalize for Incrementers {}
+
+impl StatsResult {
+    fn to_object<'a>(&self, cx: &mut impl Context<'a>) -> JsResult<'a, JsObject> {
+        let StatsResult {
+            outstanding_sends,
+            outstanding_receives,
+            receive_elapsed,
+        } = self;
+
+        let obj = cx.empty_object();
+
+        let outstanding_receives = outstanding_receives.to_object(cx)?;
+        obj.set(cx, "outstanding_receives", outstanding_receives)?;
+
+        let outstanding_sends = outstanding_sends.to_object(cx)?;
+        obj.set(cx, "outstanding_sends", outstanding_sends)?;
+
+        let receive_elapsed = receive_elapsed.to_object(cx)?;
+        obj.set(cx, "receive_elapsed", receive_elapsed)?;
+
+        Ok(obj)
+    }
+}
+
+impl RingBufferStats<usize> {
+    fn to_object<'a>(&self, cx: &mut impl Context<'a>) -> JsResult<'a, JsObject> {
+        to_stats_object(
+            cx,
+            self.long_term_max as f64,
+            self.long_term_min as f64,
+            self.min as f64,
+            self.max as f64,
+            self.total as f64,
+            self.count,
+        )
+    }
+}
+
+impl RingBufferStats<Duration> {
+    fn to_object<'a>(&self, cx: &mut impl Context<'a>) -> JsResult<'a, JsObject> {
+        to_stats_object(
+            cx,
+            self.long_term_max.as_millis() as f64,
+            self.long_term_min.as_millis() as f64,
+            self.min.as_millis() as f64,
+            self.max.as_millis() as f64,
+            self.total.as_millis() as f64,
+            self.count,
+        )
+    }
+}
+
+fn to_stats_object<'a>(cx: &mut impl Context<'a>, long_term_max: f64, long_term_min: f64, min: f64, max: f64, total: f64, count: usize) -> JsResult<'a, JsObject> {
+    let obj = cx.empty_object();
+
+    let long_term_max = cx.number(long_term_max);
+    obj.set(cx, "long_term_max", long_term_max)?;
+
+    let long_term_min = cx.number(long_term_min);
+    obj.set(cx, "long_term_min", long_term_min)?;
+
+    let min = cx.number(min);
+    obj.set(cx, "min", min)?;
+
+    let max = cx.number(max);
+    obj.set(cx, "max", max)?;
+
+    let total_num = cx.number(total);
+    obj.set(cx, "total", total_num)?;
+
+    let count_num = cx.number(count as f64);
+    obj.set(cx, "count", count_num)?;
+
+    let average = if count > 0 { total / count as f64 } else { 0f64 };
+    let average = cx.number(average);
+    obj.set(cx, "average", average)?;
+
+    Ok(obj)
+}
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {

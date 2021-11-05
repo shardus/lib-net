@@ -170,7 +170,9 @@ export const Sn = (opts: { port: number; address?: string }) => {
     return _net.stopListening(server)
   }
 
-  const returnVal = { send, listen, stopListening }
+  const stats = () => _net.stats();
+
+  const returnVal = { send, listen, stopListening, stats }
 
   return returnVal
 }

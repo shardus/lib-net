@@ -25,7 +25,7 @@ const main = async () => {
   let data = JSON.stringify(receipt);
 
   const promises = []
-  for (let i = 0; i < 1; i++) {
+  for (let i = 0; i < 100; i++) {
     promises.push(sn.send(target.port, target.address, data, RESPONSE_TIMEOUT_MILLIS, (response) => {
       console.log("Received response:", response);
     }, () => {
@@ -35,6 +35,8 @@ const main = async () => {
   console.log(promises)
   await Promise.all(promises).catch(console.error)
   console.log("Completed");
+
+  console.log(sn.stats());
 }
 
 main()
