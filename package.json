@@ -6,7 +6,8 @@
   "types": "build/src/index.d.ts",
   "files": [
     "src/**/*",
-    "Cargo.*"
+    "Cargo.*",
+    "tsconfig.json"
   ],
   "scripts": {
     "build": "npm run build-rust-release && npm run build-node",
