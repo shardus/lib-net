@@ -97,6 +97,12 @@ const server = await sn.listen((data, remote, protocol, respond) => {
 await sn.stopListening(servers);
 ```
 
+## Developing
+
+If you're trying to develop on the `shardus-net` package Be sure to run the `build` npm script by hand to ensure both TS and Rust files get made.
+
+If you're trying to publish a release to NPM, use the `release` npm script.
+
 ## Contributors
 
 Special thanks to Aaron Sullivan (<aasullivan1618@gmail.com>) for the contributions that became the base for this library.

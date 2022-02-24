@@ -1,13 +1,12 @@
 {
   "name": "@shardus/net",
-  "version": "1.0.6",
+  "version": "1.0.5",
   "description": "",
   "main": "build/src/index.js",
   "types": "build/src/index.d.ts",
   "files": [
-    "src/**/*",
-    "Cargo.*",
-    "tsconfig.json"
+    "build/**/*",
+    "Cargo.*"
   ],
   "scripts": {
     "build": "npm run build-rust-release && npm run build-node",
@@ -16,7 +15,8 @@
     "build-rust-debug": "npm run build-rust --",
     "build-rust-release": "npm run build-rust -- --release",
     "release": "np --no-cleanup --no-yarn --any-branch",
-    "postinstall": "npm run build",
+    "prepack": "npm run build-node",
+    "postinstall": "npm run build-rust",
     "test": "cargo test"
   },
   "repository": {
