@@ -29,13 +29,28 @@ export type ResponseCallback = (data?: unknown) => void
 
 export type TimeoutCallback = () => void
 
-export type ListenCallback = (
-  data: unknown,
-  remote: RemoteSender,
-  respond: ResponseCallback
-) => void
+export const isObject = (val) => {
+  if (val === null) {
+    return false
+  }
+  if (Array.isArray(val)) {
+    return false
+  }
+  return typeof val === 'function' || typeof val === 'object'
+}
 
-const noop = () => { }
+function base64BufferReviver(key: string, value: any) {
+  const originalObject = value
+  if (isObject(originalObject) && originalObject.hasOwnProperty('dataType') && originalObject.dataType && originalObject.dataType == 'bh') {
+    return Buffer.from(originalObject.data, 'base64')
+  } else {
+    return value
+  }
+}
+
+export type ListenCallback = (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void
+
+const noop = () => {}
 
 // We have to generate a closure so,
 // 1) We can test simulated from two isolated environments, and
@@ -46,33 +61,30 @@ const noop = () => { }
 // the `send` function can augment its sent data with the port the `listen`
 // function will be listening on. This is necessary to simulate "responding"
 // to a "request".
-export const Sn = (opts: { port: number; address?: string }) => {
+export const Sn = (opts: { port: number; address?: string; customStringifier?: (val: any) => string }) => {
   validate(opts)
 
   const PORT = opts.port
   const ADDRESS = opts.address || DEFAULT_ADDRESS
 
-  const _net = net.Sn(PORT, ADDRESS);
+  const _net = net.Sn(PORT, ADDRESS)
 
   // we're going to keep track of response IDs here
   const responseUUIDMapping: { [uuid: string]: (data: unknown) => void } = {}
 
-  const _sendAug = async (
-    port: number,
-    address: string,
-    augData: AugmentedData,
-    timeout: number,
-    onResponse: ResponseCallback,
-    onTimeout: TimeoutCallback
-  ) => {
-    const stringifiedData = JSON.stringify(augData)
-
+  const _sendAug = async (port: number, address: string, augData: AugmentedData, timeout: number, onResponse: ResponseCallback, onTimeout: TimeoutCallback) => {
+    let stringifiedData: string
+    if (opts.customStringifier) {
+      stringifiedData = opts.customStringifier(augData)
+    } else {
+      stringifiedData = JSON.stringify(augData)
+    }
     return new Promise<void>((resolve, reject) => {
       _net.send(port, address, stringifiedData, (error) => {
         if (error) {
-          reject(error);
+          reject(error)
         } else {
-          resolve();
+          resolve()
         }
       })
 
@@ -91,14 +103,7 @@ export const Sn = (opts: { port: number; address?: string }) => {
     })
   }
 
-  const send = async (
-    port: number,
-    address: string,
-    data: unknown,
-    timeout = 0,
-    onResponse: ResponseCallback = noop,
-    onTimeout: TimeoutCallback = noop
-  ) => {
+  const send = async (port: number, address: string, data: unknown, timeout = 0, onResponse: ResponseCallback = noop, onTimeout: TimeoutCallback = noop) => {
     const UUID = uuid()
 
     // Under the hood, sn needs to pass around some extra data for its own internal usage.
@@ -112,23 +117,13 @@ export const Sn = (opts: { port: number; address?: string }) => {
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
 
-  const listen = async (
-    handleData: (
-      data: unknown,
-      remote: RemoteSender,
-      respond: ResponseCallback
-    ) => void
-  ) => {
+  const listen = async (handleData: (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void) => {
     // This is a wrapped form of the 'handleData' callback the user supplied.
     // Its job is to determine if the incoming data is a response to a request
     // the user sent. It does this by referencing the UUID map object.
-    const extractUUIDHandleData = (
-      augDataStr: string,
-      remote: RemoteSender
-    ) => {
+    const extractUUIDHandleData = (augDataStr: string, remote: RemoteSender) => {
       // [TODO] Secure this with validation
-      const augData: AugmentedData = JSON.parse(augDataStr)
-
+      let augData: AugmentedData = JSON.parse(augDataStr, base64BufferReviver)
       const { PORT, UUID, data } = augData
       const address = remote.address
 
@@ -143,9 +138,7 @@ export const Sn = (opts: { port: number; address?: string }) => {
 
       // If we are expecting a response, go through the respond mechanism.
       // Otherwise, it's a normal incoming message.
-      const handle = responseUUIDMapping[UUID]
-        ? responseUUIDMapping[UUID]
-        : handleData
+      const handle = responseUUIDMapping[UUID] ? responseUUIDMapping[UUID] : handleData
 
       // Clear the respond mechanism.
       delete responseUUIDMapping[UUID]
@@ -159,8 +152,8 @@ export const Sn = (opts: { port: number; address?: string }) => {
     const server = await _net.listen((data, remoteIp, remotePort) => {
       extractUUIDHandleData(data, {
         address: remoteIp,
-        port: remotePort
-      });
+        port: remotePort,
+      })
     })
 
     return server
@@ -170,7 +163,7 @@ export const Sn = (opts: { port: number; address?: string }) => {
     return _net.stopListening(server)
   }
 
-  const stats = () => _net.stats();
+  const stats = () => _net.stats()
 
   const returnVal = { send, listen, stopListening, stats }
 
