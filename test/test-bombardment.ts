@@ -2,17 +2,23 @@ import { Sn } from '../build/src'
 
 // Test constants
 
-const NUMBER_OF_SOCKET_CLIENTS = 1000 // Unique socket clients to be used for the bombardment
+const NUMBER_OF_SOCKET_CLIENTS = 128 // Unique socket clients to be used for the bombardment
 const STARTING_PORT = 49152
 const NUMBER_OF_BOMBS: number = -1 // Number of socket bombs to be sent per socket client (-1 for infinite)
-const TARGET_SOCKET_HOST = '127.0.0.1' // Internal host of the validator to be bombarded
+const TARGET_SOCKET_HOST = '18.166.210.228' // Internal host of the validator to be bombarded
 const TARGET_SOCKET_PORT = 10001 // Internal port of the validator to be bombarded
-const MESSAGE_JSON = { route: '/bombardment-test', payload: 'Hello, world!' } // Message to be sent to the validator
+const MESSAGE_JSON = { route: 'bombardment-test', payload: 'Hello, world!' } // Message to be sent to the validator
+const RAMP_UP_STRATEGY: 'linear' | 'none' = 'none' // Ramp up strategy to be used for the bombardment
+const RAMP_UP_EVERY_X_BOMBS = 10 // Number of bombs to be sent before ramping up the number of socket clients
 
 // Test variables
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const socketClients: any[] = []
+let metrics = {
+  successfulSends: 0,
+  failedSends: 0,
+}
 
 // Setup helpers
 
@@ -34,13 +40,21 @@ function delay(ms: number) {
 
 async function socketBombardment() {
   setupSocketClients()
-  await delay(10000)
+  await delay(3000)
 
   for (let i = 0; i < NUMBER_OF_BOMBS || NUMBER_OF_BOMBS === -1; i++) {
     const promises: Promise<void>[] = []
+    const baseSocketClients = Math.floor(NUMBER_OF_SOCKET_CLIENTS / RAMP_UP_EVERY_X_BOMBS)
     console.log(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS === -1 ? 'infinite' : NUMBER_OF_BOMBS}`)
-    for (let j = 0; j < NUMBER_OF_SOCKET_CLIENTS; j++) {
-      console.log(`Sending message ${j + 1} of ${NUMBER_OF_SOCKET_CLIENTS}`)
+    let socketClientsToUse = NUMBER_OF_SOCKET_CLIENTS
+    if (RAMP_UP_STRATEGY === 'linear' && i % RAMP_UP_EVERY_X_BOMBS === 0) {
+      console.log(`Ramping up socket clients from ${socketClientsToUse} to ${baseSocketClients * Math.floor(i / RAMP_UP_EVERY_X_BOMBS)}`)
+      socketClientsToUse = baseSocketClients * Math.floor(i / RAMP_UP_EVERY_X_BOMBS)
+      if (socketClientsToUse > NUMBER_OF_SOCKET_CLIENTS)
+        socketClientsToUse = NUMBER_OF_SOCKET_CLIENTS
+    }
+    for (let j = 0; j < socketClientsToUse; j++) {
+      // console.log(`Sending message ${j + 1} of ${NUMBER_OF_SOCKET_CLIENTS}`)
       // eslint-disable-next-line security/detect-object-injection
       promises.push(
         socketClients[j]
