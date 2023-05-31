@@ -5,7 +5,9 @@ use std::collections::HashMap;
 
 use std::io;
 use std::net::SocketAddr;
+use std::num::NonZeroUsize;
 
+use lru::LruCache;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
@@ -32,7 +34,17 @@ impl ShardusNetSender {
     pub fn new() -> Self {
         let (send_channel, send_channel_rx) = unbounded_channel();
 
-        Self::spawn_sender(send_channel_rx);
+        let connections = Box::new(HashMap::new());
+        Self::spawn_sender(send_channel_rx, connections);
+
+        Self { send_channel }
+    }
+
+    pub fn new_lru(lru_size: NonZeroUsize) -> Self {
+        let (send_channel, send_channel_rx) = unbounded_channel();
+
+        let connections = Box::new(LruCache::new(lru_size));
+        Self::spawn_sender(send_channel_rx, connections);
 
         Self { send_channel }
     }
@@ -43,13 +55,12 @@ impl ShardusNetSender {
             .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
     }
 
-    fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, String, Sender<SendResult>)>) {
+    fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, String, Sender<SendResult>)>, mut connections: Box<dyn ConnectionCache + Send>) {
         RUNTIME.spawn(async move {
-            let mut connections = HashMap::<SocketAddr, Arc<Connection>>::new();
             let mut send_channel_rx = send_channel_rx;
 
             while let Some((address, data, complete_tx)) = send_channel_rx.recv().await {
-                let connection = connections.entry(address).or_insert_with(|| Arc::new(Connection::new(address))).clone();
+                let connection = connections.get_or_insert(address);
 
                 RUNTIME.spawn(async move {
                     let result = connection.send(&data).await;
@@ -62,7 +73,7 @@ impl ShardusNetSender {
     }
 }
 
-struct Connection {
+pub struct Connection {
     address: SocketAddr,
     socket: Mutex<Option<TcpStream>>,
 }
@@ -129,6 +140,29 @@ impl Drop for Connection {
     fn drop(&mut self) {
         if let Some(stream) = self.socket.get_mut() {
             RUNTIME.block_on(stream.shutdown()).ok();
+        }
+    }
+}
+
+pub trait ConnectionCache {
+    fn get_or_insert(&mut self, address: SocketAddr) -> Arc<Connection>;
+}
+
+impl ConnectionCache for HashMap<SocketAddr, Arc<Connection>> {
+    fn get_or_insert(&mut self, address: SocketAddr) -> Arc<Connection> {
+        self.entry(address).or_insert_with(|| Arc::new(Connection::new(address))).clone()
+    }
+}
+
+impl ConnectionCache for LruCache<SocketAddr, Arc<Connection>> {
+    fn get_or_insert(&mut self, address: SocketAddr) -> Arc<Connection> {
+        match self.get(&address) {
+            Some(connection) => connection.clone(),
+            None => {
+                let connection = Arc::new(Connection::new(address));
+                self.put(address, connection.clone());
+                connection
+            }
         }
     }
 }

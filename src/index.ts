@@ -50,7 +50,17 @@ function base64BufferReviver(key: string, value: any) {
 
 export type ListenCallback = (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void
 
-const noop = () => {}
+const noop = () => { }
+
+export type SnOpts = {
+  port: number
+  address?: string
+  senderOpts?: {
+    useLruCache?: boolean
+    lruSize: number
+  }
+  customStringifier?: (val: any) => string
+}
 
 // We have to generate a closure so,
 // 1) We can test simulated from two isolated environments, and
@@ -61,11 +71,13 @@ const noop = () => {}
 // the `send` function can augment its sent data with the port the `listen`
 // function will be listening on. This is necessary to simulate "responding"
 // to a "request".
-export const Sn = (opts: { port: number; address?: string; customStringifier?: (val: any) => string }) => {
+export const Sn = (opts: SnOpts) => {
   validate(opts)
 
   const PORT = opts.port
   const ADDRESS = opts.address || DEFAULT_ADDRESS
+  const USE_LRU_CACHE = (opts.senderOpts && opts.senderOpts.useLruCache) || false
+  const LRU_SIZE = (opts.senderOpts && opts.senderOpts.lruSize) || 1028
 
   const _net = net.Sn(PORT, ADDRESS)
 

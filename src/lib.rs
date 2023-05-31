@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::num::NonZeroUsize;
 use std::time::Duration;
 use std::time::Instant;
 use std::{net::ToSocketAddrs, sync::Arc};
@@ -22,8 +23,15 @@ use tokio::sync::oneshot;
 
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
-    let shardus_net_listener = create_shardus_net_listener(cx)?;
-    let shardus_net_sender = create_shardus_net_sender();
+
+    // Extract args
+    let port = cx.argument::<JsNumber>(0)?.value(cx);
+    let host = cx.argument::<JsString>(1)?.value(cx);
+    let use_lru = cx.argument::<JsBoolean>(2)?.value(cx);
+    let lru_size = cx.argument::<JsNumber>(3)?.value(cx);
+
+    let shardus_net_listener = create_shardus_net_listener(cx, port, host)?;
+    let shardus_net_sender = create_shardus_net_sender(use_lru, NonZeroUsize::new(lru_size as usize).unwrap());
     let (stats, stats_incrementers) = Stats::new();
     let shardus_net_listener = cx.boxed(shardus_net_listener);
     let shardus_net_sender = cx.boxed(shardus_net_sender);
@@ -160,10 +168,7 @@ fn get_stats(mut cx: FunctionContext) -> JsResult<JsObject> {
     Ok(stats)
 }
 
-fn create_shardus_net_listener(cx: &mut FunctionContext) -> Result<Arc<ShardusNetListener>, Throw> {
-    let port = cx.argument::<JsNumber>(0)?.value(cx);
-    let host = cx.argument::<JsString>(1)?.value(cx);
-
+fn create_shardus_net_listener(cx: &mut FunctionContext, port: f64, host: String) -> Result<Arc<ShardusNetListener>, Throw> {
     // @TODO: Verify that a javascript number properly converts here without loss.
     let address = (host, port as u16);
 
@@ -175,7 +180,10 @@ fn create_shardus_net_listener(cx: &mut FunctionContext) -> Result<Arc<ShardusNe
     }
 }
 
-fn create_shardus_net_sender() -> Arc<ShardusNetSender> {
+fn create_shardus_net_sender(use_lru: bool, lru_size: NonZeroUsize) -> Arc<ShardusNetSender> {
+    if use_lru {
+        return Arc::new(ShardusNetSender::new_lru(lru_size));
+    }
     Arc::new(ShardusNetSender::new())
 }
 
