@@ -1,6 +1,6 @@
 import { Sn } from '../build/src'
 
-const RESPONSE_DELAY_MILLIS = 1000
+const RESPONSE_DELAY_MILLIS = 200
 const USE_LRU_CACHE = false
 
 const setupLruSender = () => {
@@ -18,7 +18,6 @@ const setupLruSender = () => {
     return Sn({
       port
     })
-
   }
 }
 

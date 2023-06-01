@@ -66,7 +66,45 @@ async function socketBombardment() {
   }
 }
 
-socketBombardment()
+async function socketBombardmentWithLimitedActiveSockets(numberOfActiveSockets: number) {
+  setupSocketClients()
+  await delay(3000)
+
+  for (let i = 0; i < NUMBER_OF_BOMBS || NUMBER_OF_BOMBS === -1; i++) {
+    const promises: Promise<void>[] = []
+    console.log(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS === -1 ? 'infinite' : NUMBER_OF_BOMBS}`)
+    let socketClientsToUse = NUMBER_OF_SOCKET_CLIENTS
+    if (i != 0)
+      socketClientsToUse = numberOfActiveSockets
+    for (let j = 0; j < socketClientsToUse; j++) {
+      // eslint-disable-next-line security/detect-object-injection
+      promises.push(
+        socketClients[j]
+          .send(TARGET_SOCKET_PORT, TARGET_SOCKET_HOST, MESSAGE_JSON)
+          .catch((err) => console.error(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS} failed. Error: ${err}`))
+      )
+    }
+    await Promise.all(promises)
+  }
+}
+
+async function socketBombardmentWithInRandomOrder() {
+
+}
+
+// console.log('Starting socket bombardment: socketBombardment')
+// socketBombardment()
+//   .then(() => {
+//     console.log('Socket bombardment complete')
+//     process.exit(0)
+//   })
+//   .catch((err) => {
+//     console.log(err)
+//     process.exit(1)
+//   })
+
+console.log('Starting socket bombardment: socketBombardmentWithLimitedActiveSockets')
+socketBombardmentWithLimitedActiveSockets(128)
   .then(() => {
     console.log('Socket bombardment complete')
     process.exit(0)
