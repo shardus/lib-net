@@ -79,7 +79,7 @@ export const Sn = (opts: SnOpts) => {
   const USE_LRU_CACHE = (opts.senderOpts && opts.senderOpts.useLruCache) || false
   const LRU_SIZE = (opts.senderOpts && opts.senderOpts.lruSize) || 1028
 
-  const _net = net.Sn(PORT, ADDRESS)
+  const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE)
 
   // we're going to keep track of response IDs here
   const responseUUIDMapping: { [uuid: string]: (data: unknown) => void } = {}

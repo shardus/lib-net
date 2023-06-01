@@ -1,6 +1,6 @@
 const { rejects } = require('assert')
 const { resolve } = require('path/posix')
-const { Sn } = require('../.')
+const { Sn } = require('../build/src')
 const address = '127.0.0.1'
 const port = 5001
 
@@ -28,7 +28,7 @@ const main = async () => {
 main().catch((err) => console.log("ERROR: ", err))
 
 function wait() {
-  setTimeout(wait, 1000);
+  setTimeout(wait, 200);
 };
 
 wait()

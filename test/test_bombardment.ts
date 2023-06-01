@@ -2,11 +2,11 @@ import { Sn } from '../build/src'
 
 // Test constants
 
-const NUMBER_OF_SOCKET_CLIENTS = 128 // Unique socket clients to be used for the bombardment
-const STARTING_PORT = 49152
+const NUMBER_OF_SOCKET_CLIENTS = 1024 // Unique socket clients to be used for the bombardment
+const STARTING_PORT = 49153
 const NUMBER_OF_BOMBS: number = -1 // Number of socket bombs to be sent per socket client (-1 for infinite)
-const TARGET_SOCKET_HOST = '18.166.210.228' // Internal host of the validator to be bombarded
-const TARGET_SOCKET_PORT = 10001 // Internal port of the validator to be bombarded
+const TARGET_SOCKET_HOST = '127.0.0.1' // Internal host of the validator to be bombarded
+const TARGET_SOCKET_PORT = 49152 // Internal port of the validator to be bombarded
 const MESSAGE_JSON = { route: 'bombardment-test', payload: 'Hello, world!' } // Message to be sent to the validator
 const RAMP_UP_STRATEGY: 'linear' | 'none' = 'none' // Ramp up strategy to be used for the bombardment
 const RAMP_UP_EVERY_X_BOMBS = 10 // Number of bombs to be sent before ramping up the number of socket clients
