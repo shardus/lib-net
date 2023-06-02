@@ -1,6 +1,6 @@
 import { Sn } from '../build/src'
 
-const RESPONSE_DELAY_MILLIS = 200
+const RESPONSE_DELAY_MILLIS = 500
 const USE_LRU_CACHE = false
 
 const setupLruSender = () => {
@@ -23,14 +23,17 @@ const setupLruSender = () => {
 
 const main = async () => {
   const sn = setupLruSender()
-  await sn.listen((data: any, remote, respond) => {
-    console.log(`Received: ${data.length} from ${JSON.stringify(remote)}`);
+  let counter = 0
+  await sn.listen((data: unknown, remote, respond) => {
+    console.log(`${data}`)
+    console.log(`Received: ${JSON.stringify(data)} from ${JSON.stringify(remote)}`);
 
     setTimeout(() => {
       respond("Response message");
     }, RESPONSE_DELAY_MILLIS);
 
-    console.log(sn.stats());
+    if (counter++ % 1000 === 0)
+      console.log(sn.stats());
   })
 }
 
