@@ -1,7 +1,7 @@
 import { Sn } from '../build/src'
 
 const RESPONSE_DELAY_MILLIS = 500
-const USE_LRU_CACHE = false
+const USE_LRU_CACHE = true
 
 const setupLruSender = () => {
   const port = 49152
@@ -9,8 +9,8 @@ const setupLruSender = () => {
     console.log("Using LRU cache")
     return Sn({
       port, senderOpts: {
-        useLruCache: false,
-        lruSize: 128,
+        useLruCache: true,
+        lruSize: 5,
       }
     })
   } else {

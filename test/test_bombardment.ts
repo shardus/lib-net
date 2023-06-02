@@ -2,9 +2,9 @@ import { Sn } from '../build/src'
 
 // Test constants
 
-const NUMBER_OF_SOCKET_CLIENTS = 4096 // Unique socket clients to be used for the bombardment
+const NUMBER_OF_SOCKET_CLIENTS = 10 // Unique socket clients to be used for the bombardment
 const STARTING_PORT = 49153
-const NUMBER_OF_BOMBS: number = 1 // Number of socket bombs to be sent per socket client (-1 for infinite)
+const NUMBER_OF_BOMBS: number = 2 // Number of socket bombs to be sent per socket client (-1 for infinite)
 const TARGET_SOCKET_HOST = '127.0.0.1' // Internal host of the validator to be bombarded
 const TARGET_SOCKET_PORT = 49152 // Internal port of the validator to be bombarded
 const MESSAGE_JSON = { route: 'bombardment-test', payload: 'Hello, world!' } // Message to be sent to the validator
@@ -71,7 +71,7 @@ async function socketBombardmentWithLimitedActiveSockets(numberOfActiveSockets: 
   await delay(3000)
 
   for (let i = 0; i < NUMBER_OF_BOMBS || NUMBER_OF_BOMBS === -1; i++) {
-    const promises: Promise<void>[] = []
+    const promises: (() => Promise<void>)[] = []
     console.log(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS === -1 ? 'infinite' : NUMBER_OF_BOMBS}`)
     let socketClientsToUse = NUMBER_OF_SOCKET_CLIENTS
     if (i != 0)
@@ -79,12 +79,15 @@ async function socketBombardmentWithLimitedActiveSockets(numberOfActiveSockets: 
     for (let j = 0; j < socketClientsToUse; j++) {
       // eslint-disable-next-line security/detect-object-injection
       promises.push(
-        socketClients[j]
-          .send(TARGET_SOCKET_PORT, TARGET_SOCKET_HOST, MESSAGE_JSON)
-          .catch((err) => console.error(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS} failed. Error: ${err}`))
+        () => {
+          console.log(`Sending message ${j + 1} of ${socketClientsToUse}`)
+          return socketClients[j]
+            .send(TARGET_SOCKET_PORT, TARGET_SOCKET_HOST, MESSAGE_JSON)
+            .catch((err: Error) => console.error(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS} failed. Error: ${err}`))
+        }
       )
     }
-    await Promise.all(promises)
+    await Promise.all(promises.map(p => p()))
   }
 }
 
@@ -104,7 +107,7 @@ async function socketBombardmentWithInRandomOrder() {
 //   })
 
 console.log('Starting socket bombardment: socketBombardmentWithLimitedActiveSockets')
-socketBombardmentWithLimitedActiveSockets(1)
+socketBombardmentWithLimitedActiveSockets(5)
   .then(() => {
     console.log('Socket bombardment complete')
     process.exit(0)
