@@ -1,4 +1,4 @@
-import { Sn } from '../build/src'
+import { Sn } from '../.'
 
 // Test constants
 

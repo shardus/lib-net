@@ -1,4 +1,4 @@
-import { Sn } from '../build/src'
+import { Sn } from '../.'
 
 const RESPONSE_DELAY_MILLIS = 500
 const USE_LRU_CACHE = true

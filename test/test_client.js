@@ -1,4 +1,4 @@
-const { Sn } = require('../build/src')
+const { Sn } = require('../.')
 const receipt = require('./applie_receipt.json')
 
 const address = '127.0.0.1'

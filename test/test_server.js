@@ -1,6 +1,6 @@
 const { rejects } = require('assert')
 const { resolve } = require('path/posix')
-const { Sn } = require('../build/src')
+const { Sn } = require('../.')
 const address = '127.0.0.1'
 const port = 5001
 
