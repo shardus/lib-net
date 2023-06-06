@@ -134,13 +134,6 @@ impl Connection {
         socket.write_u32(len).await?;
         socket.write_all(data.as_bytes()).await
     }
-
-    async fn close(&self) {
-        let mut guard = self.socket.lock().await;
-        if let Some(stream) = guard.take() {
-            drop(stream);
-        }
-    }
 }
 
 impl Drop for Connection {
@@ -163,14 +156,13 @@ impl ConnectionCache for HashMap<SocketAddr, Arc<Connection>> {
 
 impl ConnectionCache for LruCache<SocketAddr, Arc<Connection>> {
     fn get_or_insert(&mut self, address: SocketAddr) -> Arc<Connection> {
-        println!("LruCache size: {}", self.len());
+        info!("LruCache stats, current_size: {}, capacity: {}", self.len(), self.cap());
         match self.get(&address) {
             Some(connection) => connection.clone(),
             None => {
                 let connection = Arc::new(Connection::new(address));
-                self.push(address, connection.clone());
-                // If there was a connection removed, close it.
-                // removed_entry.map(|(_, removed_connection)| RUNTIME.block_on(removed_connection.close()));
+                // `put` used instead of push to avoid memory leak. 
+                self.put(address, connection.clone());
                 connection
             }
         }
