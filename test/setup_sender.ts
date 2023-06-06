@@ -6,7 +6,6 @@ const USE_LRU_CACHE = true
 const setupLruSender = () => {
   const port = 49152
   if (USE_LRU_CACHE) {
-    console.log("Using LRU cache")
     return Sn({
       port, senderOpts: {
         useLruCache: true,
@@ -14,7 +13,6 @@ const setupLruSender = () => {
       }
     })
   } else {
-    console.log("Using hash map cache")
     return Sn({
       port
     })

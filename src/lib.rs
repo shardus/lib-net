@@ -5,6 +5,7 @@ use std::time::Instant;
 use std::{net::ToSocketAddrs, sync::Arc};
 
 use log::LevelFilter;
+use log::info;
 use neon::{prelude::*, result::Throw};
 
 mod ring_buffer;
@@ -182,8 +183,10 @@ fn create_shardus_net_listener(cx: &mut FunctionContext, port: f64, host: String
 
 fn create_shardus_net_sender(use_lru: bool, lru_size: NonZeroUsize) -> Arc<ShardusNetSender> {
     if use_lru {
+        info!("Using LRU cache with size {} for socket mgmt", lru_size.get());
         return Arc::new(ShardusNetSender::new_lru(lru_size));
     }
+    info!("Using hashmap for socket mgmt");
     Arc::new(ShardusNetSender::new())
 }
 
