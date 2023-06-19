@@ -4,7 +4,7 @@ use log::{error, info};
 use std::collections::HashMap;
 
 use std::io;
-use std::net::SocketAddr;
+use std::net::{Shutdown, SocketAddr};
 use std::num::NonZeroUsize;
 
 use lru::LruCache;
@@ -138,8 +138,10 @@ impl Connection {
 
 impl Drop for Connection {
     fn drop(&mut self) {
-        if let Some(stream) = self.socket.get_mut() {
-            RUNTIME.block_on(stream.shutdown()).ok();
+        if let Some(mut stream) = self.socket.get_mut().take() {
+            tokio::spawn(async move {
+                stream.shutdown().await.ok();
+            });
         }
     }
 }
@@ -161,7 +163,7 @@ impl ConnectionCache for LruCache<SocketAddr, Arc<Connection>> {
             Some(connection) => connection.clone(),
             None => {
                 let connection = Arc::new(Connection::new(address));
-                // `put` used instead of push to avoid memory leak. 
+                // `put` used instead of push to avoid memory leak.
                 self.put(address, connection.clone());
                 connection
             }
