@@ -4,7 +4,7 @@ use log::{error, info};
 use std::collections::HashMap;
 
 use std::io;
-use std::net::{Shutdown, SocketAddr};
+use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 
 use lru::LruCache;
