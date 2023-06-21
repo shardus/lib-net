@@ -47,7 +47,7 @@ const main = async () => {
       await sn.send(+inputs[1], '127.0.0.1', { message, fromPort: +port })
       console.log('Message sent')
     } else if (inputs.length === 2) {
-      await sn.evictSocket(+inputs[1], '127.0.0.1')
+      sn.evictSocket(+inputs[1], '127.0.0.1')
       console.log('Cache cleared')
     } else {
       console.log('=> send <port> <message>')

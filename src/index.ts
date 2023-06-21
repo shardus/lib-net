@@ -192,7 +192,7 @@ export const Sn = (opts: SnOpts) => {
     return server
   }
 
-  const evictSocket = async (port: number, address: string) => {
+  const evictSocket = (port: number, address: string) => {
     return _net.evict_socket(port, address)
   }
 
