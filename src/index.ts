@@ -41,7 +41,12 @@ export const isObject = (val) => {
 
 function base64BufferReviver(key: string, value: any) {
   const originalObject = value
-  if (isObject(originalObject) && originalObject.hasOwnProperty('dataType') && originalObject.dataType && originalObject.dataType == 'bh') {
+  if (
+    isObject(originalObject) &&
+    originalObject.hasOwnProperty('dataType') &&
+    originalObject.dataType &&
+    originalObject.dataType == 'bh'
+  ) {
     return Buffer.from(originalObject.data, 'base64')
   } else {
     return value
@@ -50,7 +55,7 @@ function base64BufferReviver(key: string, value: any) {
 
 export type ListenCallback = (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void
 
-const noop = () => { }
+const noop = () => {}
 
 export type SnOpts = {
   port: number
@@ -84,7 +89,14 @@ export const Sn = (opts: SnOpts) => {
   // we're going to keep track of response IDs here
   const responseUUIDMapping: { [uuid: string]: (data: unknown) => void } = {}
 
-  const _sendAug = async (port: number, address: string, augData: AugmentedData, timeout: number, onResponse: ResponseCallback, onTimeout: TimeoutCallback) => {
+  const _sendAug = async (
+    port: number,
+    address: string,
+    augData: AugmentedData,
+    timeout: number,
+    onResponse: ResponseCallback,
+    onTimeout: TimeoutCallback
+  ) => {
     let stringifiedData: string
     if (opts.customStringifier) {
       stringifiedData = opts.customStringifier(augData)
@@ -115,7 +127,14 @@ export const Sn = (opts: SnOpts) => {
     })
   }
 
-  const send = async (port: number, address: string, data: unknown, timeout = 0, onResponse: ResponseCallback = noop, onTimeout: TimeoutCallback = noop) => {
+  const send = async (
+    port: number,
+    address: string,
+    data: unknown,
+    timeout = 0,
+    onResponse: ResponseCallback = noop,
+    onTimeout: TimeoutCallback = noop
+  ) => {
     const UUID = uuid()
 
     // Under the hood, sn needs to pass around some extra data for its own internal usage.
@@ -129,7 +148,9 @@ export const Sn = (opts: SnOpts) => {
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
 
-  const listen = async (handleData: (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void) => {
+  const listen = async (
+    handleData: (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void
+  ) => {
     // This is a wrapped form of the 'handleData' callback the user supplied.
     // Its job is to determine if the incoming data is a response to a request
     // the user sent. It does this by referencing the UUID map object.
@@ -171,13 +192,17 @@ export const Sn = (opts: SnOpts) => {
     return server
   }
 
+  const evictSocket = async (port: number, address: string) => {
+    return _net.evict_socket(port, address)
+  }
+
   const stopListening = (server: any) => {
     return _net.stopListening(server)
   }
 
   const stats = () => _net.stats()
 
-  const returnVal = { send, listen, stopListening, stats }
+  const returnVal = { send, listen, stopListening, stats, evictSocket }
 
   return returnVal
 }

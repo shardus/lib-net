@@ -50,7 +50,7 @@ impl ShardusNetSender {
     pub fn evict_socket(&self, address: SocketAddr) {
         self.evict_socket_channel
             .send(address)
-            .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
+            .expect("Unexpected! Failed to send data to channel. Socket evictor task must have been dropped.");
     }
 
     fn spawn_evictor(evict_socket_channel_rx: UnboundedReceiver<SocketAddr>, connections: Arc<Mutex<dyn ConnectionCache + Send>>) {

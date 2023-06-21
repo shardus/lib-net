@@ -42,12 +42,16 @@ const main = async () => {
   const input = process.stdin
   input.addListener('data', async (data: Buffer) => {
     const inputs = data.toString().trim().split(' ')
-    if (inputs.length !== 3) {
-      console.log('Invalid input format: send <port> <message>')
-    } else {
+    if (inputs.length === 3) {
       const message = inputs[2]
       await sn.send(+inputs[1], '127.0.0.1', { message, fromPort: +port })
       console.log('Message sent')
+    } else if (inputs.length === 2) {
+      await sn.evictSocket(+inputs[1], '127.0.0.1')
+      console.log('Cache cleared')
+    } else {
+      console.log('=> send <port> <message>')
+      console.log('=> clear <port>')
     }
   })
 
