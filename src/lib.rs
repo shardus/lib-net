@@ -1,11 +1,14 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::time::Duration;
 use std::time::Instant;
 use std::{net::ToSocketAddrs, sync::Arc};
 
-use log::LevelFilter;
 use log::info;
+use log::LevelFilter;
+use lru::LruCache;
 use neon::{prelude::*, result::Throw};
 
 mod ring_buffer;
@@ -17,10 +20,14 @@ mod stats;
 use ring_buffer::Stats as RingBufferStats;
 use runtime::RUNTIME;
 use shardus_net_listener::ShardusNetListener;
+use shardus_net_sender::ConnectionCache;
 use shardus_net_sender::{SendResult, ShardusNetSender};
 use simplelog::{Config, SimpleLogger};
 use stats::{Incrementers, Stats, StatsResult};
 use tokio::sync::oneshot;
+use tokio::sync::Mutex;
+
+use crate::shardus_net_sender::Connection;
 
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
@@ -44,6 +51,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let listen = JsFunction::new(cx, listen)?;
     let send = JsFunction::new(cx, send)?;
     let get_stats = JsFunction::new(cx, get_stats)?;
+    let evict_socket = JsFunction::new(cx, evict_socket)?;
 
     shardus_net.set(cx, "_listener", shardus_net_listener)?;
     shardus_net.set(cx, "_sender", shardus_net_sender)?;
@@ -51,6 +59,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     shardus_net.set(cx, "_stats_incrementers", stats_incrementers)?;
     shardus_net.set(cx, "listen", listen)?;
     shardus_net.set(cx, "send", send)?;
+    shardus_net.set(cx, "evict_socket", evict_socket)?;
     shardus_net.set(cx, "stats", get_stats)?;
 
     Ok(shardus_net)
@@ -169,6 +178,24 @@ fn get_stats(mut cx: FunctionContext) -> JsResult<JsObject> {
     Ok(stats)
 }
 
+fn evict_socket(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let cx = &mut cx;
+    let port = cx.argument::<JsNumber>(0)?.value(cx);
+    let host = cx.argument::<JsString>(1)?.value(cx);
+    let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
+
+    match (host, port as u16).to_socket_addrs() {
+        Ok(mut address) => {
+            let address = address.next().expect("Expected at least one address");
+
+            shardus_net_sender.evict_socket(address);
+
+            Ok(cx.undefined())
+        }
+        Err(_) => cx.throw_type_error("The provided address is not valid"),
+    }
+}
+
 fn create_shardus_net_listener(cx: &mut FunctionContext, port: f64, host: String) -> Result<Arc<ShardusNetListener>, Throw> {
     // @TODO: Verify that a javascript number properly converts here without loss.
     let address = (host, port as u16);
@@ -182,12 +209,15 @@ fn create_shardus_net_listener(cx: &mut FunctionContext, port: f64, host: String
 }
 
 fn create_shardus_net_sender(use_lru: bool, lru_size: NonZeroUsize) -> Arc<ShardusNetSender> {
-    if use_lru {
+    let connections: Arc<Mutex<dyn ConnectionCache + Send>> = if use_lru {
         info!("Using LRU cache with size {} for socket mgmt", lru_size.get());
-        return Arc::new(ShardusNetSender::new_lru(lru_size));
-    }
-    info!("Using hashmap for socket mgmt");
-    Arc::new(ShardusNetSender::new())
+        Arc::new(Mutex::new(LruCache::new(lru_size)))
+    } else {
+        info!("Using hashmap for socket mgmt");
+        Arc::new(Mutex::new(HashMap::<SocketAddr, Arc<Connection>>::new()))
+    };
+
+    Arc::new(ShardusNetSender::new(connections))
 }
 
 impl Finalize for ShardusNetListener {}

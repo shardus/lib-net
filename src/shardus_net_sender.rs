@@ -5,7 +5,6 @@ use std::collections::HashMap;
 
 use std::io;
 use std::net::SocketAddr;
-use std::num::NonZeroUsize;
 
 use lru::LruCache;
 use std::sync::Arc;
@@ -28,25 +27,18 @@ pub type SendResult = Result<(), SenderError>;
 
 pub struct ShardusNetSender {
     send_channel: UnboundedSender<(SocketAddr, String, Sender<SendResult>)>,
+    evict_socket_channel: UnboundedSender<SocketAddr>,
 }
 
 impl ShardusNetSender {
-    pub fn new() -> Self {
+    pub fn new(connections: Arc<Mutex<dyn ConnectionCache + Send>>) -> Self {
         let (send_channel, send_channel_rx) = unbounded_channel();
+        let (evict_socket_channel, evict_socket_channel_rx) = unbounded_channel();
 
-        let connections = Box::new(HashMap::new());
-        Self::spawn_sender(send_channel_rx, connections);
+        Self::spawn_sender(send_channel_rx, Arc::clone(&connections));
+        Self::spawn_evictor(evict_socket_channel_rx, Arc::clone(&connections));
 
-        Self { send_channel }
-    }
-
-    pub fn new_lru(lru_size: NonZeroUsize) -> Self {
-        let (send_channel, send_channel_rx) = unbounded_channel();
-
-        let connections = Box::new(LruCache::new(lru_size));
-        Self::spawn_sender(send_channel_rx, connections);
-
-        Self { send_channel }
+        Self { send_channel, evict_socket_channel }
     }
 
     pub fn send(&self, address: SocketAddr, data: String, complete_tx: Sender<SendResult>) {
@@ -55,12 +47,34 @@ impl ShardusNetSender {
             .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
     }
 
-    fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, String, Sender<SendResult>)>, mut connections: Box<dyn ConnectionCache + Send>) {
+    pub fn evict_socket(&self, address: SocketAddr) {
+        self.evict_socket_channel
+            .send(address)
+            .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
+    }
+
+    fn spawn_evictor(evict_socket_channel_rx: UnboundedReceiver<SocketAddr>, connections: Arc<Mutex<dyn ConnectionCache + Send>>) {
+        RUNTIME.spawn(async move {
+            let mut evict_socket_channel_rx = evict_socket_channel_rx;
+            let mut connections = connections.lock().await;
+
+            while let Some(address) = evict_socket_channel_rx.recv().await {
+                connections.remove(&address);
+            }
+
+            info!("Evictor channel complete. Shutting down evictor task.")
+        });
+    }
+
+    fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, String, Sender<SendResult>)>, connections: Arc<Mutex<dyn ConnectionCache + Send>>) {
         RUNTIME.spawn(async move {
             let mut send_channel_rx = send_channel_rx;
 
             while let Some((address, data, complete_tx)) = send_channel_rx.recv().await {
-                let connection = connections.get_or_insert(address);
+                let connection = {
+                    let mut connections = connections.lock().await;
+                    connections.get_or_insert(address)
+                };
 
                 RUNTIME.spawn(async move {
                     let result = connection.send(&data).await;
@@ -148,11 +162,16 @@ impl Drop for Connection {
 
 pub trait ConnectionCache {
     fn get_or_insert(&mut self, address: SocketAddr) -> Arc<Connection>;
+    fn remove(&mut self, address: &SocketAddr) -> Option<Arc<Connection>>;
 }
 
 impl ConnectionCache for HashMap<SocketAddr, Arc<Connection>> {
     fn get_or_insert(&mut self, address: SocketAddr) -> Arc<Connection> {
         self.entry(address).or_insert_with(|| Arc::new(Connection::new(address))).clone()
+    }
+
+    fn remove(&mut self, address: &SocketAddr) -> Option<Arc<Connection>> {
+        self.remove(address)
     }
 }
 
@@ -168,5 +187,9 @@ impl ConnectionCache for LruCache<SocketAddr, Arc<Connection>> {
                 connection
             }
         }
+    }
+
+    fn remove(&mut self, address: &SocketAddr) -> Option<Arc<Connection>> {
+        self.pop(address)
     }
 }
