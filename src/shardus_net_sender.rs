@@ -56,10 +56,11 @@ impl ShardusNetSender {
     fn spawn_evictor(evict_socket_channel_rx: UnboundedReceiver<SocketAddr>, connections: Arc<Mutex<dyn ConnectionCache + Send>>) {
         RUNTIME.spawn(async move {
             let mut evict_socket_channel_rx = evict_socket_channel_rx;
-            let mut connections = connections.lock().await;
 
             while let Some(address) = evict_socket_channel_rx.recv().await {
+                let mut connections = connections.lock().await;
                 connections.remove(&address);
+                info!("Evicted socket {} from cache", address);
             }
 
             info!("Evictor channel complete. Shutting down evictor task.")
@@ -153,7 +154,7 @@ impl Connection {
 impl Drop for Connection {
     fn drop(&mut self) {
         if let Some(mut stream) = self.socket.get_mut().take() {
-            tokio::spawn(async move {
+            RUNTIME.spawn(async move {
                 stream.shutdown().await.ok();
             });
         }

@@ -1,4 +1,4 @@
-import { SnOpts } from "."
+import { SnOpts } from '.'
 
 // validate opts
 const validate = (opts: SnOpts) => {
@@ -6,7 +6,8 @@ const validate = (opts: SnOpts) => {
 
   if (!opts.port || typeof opts.port !== 'number') throw new Error('snq: must supply port')
 
-  if (opts.senderOpts && opts.senderOpts.useLruCache && !opts.senderOpts.lruSize) throw new Error('snq: must supply lruSize when using lruCache')
+  if (opts.senderOpts && opts.senderOpts.useLruCache && !opts.senderOpts.lruSize)
+    throw new Error('snq: must supply lruSize when using lruCache')
 }
 
 export default validate
