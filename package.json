@@ -15,6 +15,7 @@
     "build-rust": "cargo-cp-artifact --artifact cdylib shardus-net shardus-net.node -- cargo build --message-format=json-render-diagnostics",
     "build-rust-debug": "npm run build-rust --",
     "build-rust-release": "npm run build-rust -- --release",
+    "compile": "npm run build-node",
     "release": "np --no-cleanup --no-yarn --any-branch",
     "prepack": "npm run build-node",
     "postinstall": "npm run build-rust",

@@ -100,6 +100,8 @@ impl ShardusNetListener {
 
             socket_stream.read_exact(&mut buffer).await?;
 
+            // TODO_HEADERS: we need to keep this message in buffer (vec<U8>) form longer until we get to
+            // code that parses the different kinds of messages.
             let msg = String::from_utf8(buffer)?;
             received_msg_tx.send((msg, remote_addr)).map_err(|_| SendError(()))?;
         }

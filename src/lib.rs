@@ -81,6 +81,9 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let callback = Arc::new(callback);
         let this = Arc::new(this);
 
+        // rx is the UnboundedReceiver<(String, SocketAddr)> that is returned from listen.
+        // all received messages are sent to the UnboundedSender.  here we call recv to
+        // get messages from the UnboundedReceiver.  recv is a blocking call
         while let Some((msg, remote_address)) = rx.recv().await {
             let callback = callback.clone();
             let this = this.clone();
