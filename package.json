@@ -19,7 +19,8 @@
     "release": "np --no-cleanup --no-yarn --any-branch",
     "prepack": "npm run build-node",
     "postinstall": "npm run build-rust",
-    "test": "cargo test"
+    "test": "cargo test",
+    "test2": "ts-node test/test_lru.ts -p 44001 -c 2"
   },
   "repository": {
     "type": "git",
