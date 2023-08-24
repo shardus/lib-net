@@ -71,8 +71,9 @@ function logMessageInfo(augData: AugmentedData, stringifiedData:string, sending:
     //reply delta is interesting as it is the time needed for the software to get the reply ready
     logMsg += ` sendTime:${augData.sendTime} replyTime:${augData.replyTime} replyDelta:${augData.replyTime - augData.receivedTime} `
     if (sending === false) {
-      logMsg += ` recvTime:${receivedTime} recvDelta:${receivedTime - augData.sendTime}`
-      logMsg += ` replyReceivedTime:${augData.replyReceivedTime} replyReceivedDelta:${receivedTime - augData.replyReceivedTime}`
+      // note the ask is how long it took for the original ask to get a reply, not the same as recvDelta, same code but but run at a different time/state
+      logMsg += ` recvTime:${receivedTime} askDelta:${receivedTime - augData.sendTime}`
+      logMsg += ` replyRecvTime:${augData.replyReceivedTime} replyRecvDelta:${receivedTime - augData.replyReceivedTime}`
     }
   }
   
