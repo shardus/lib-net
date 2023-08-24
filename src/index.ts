@@ -20,17 +20,63 @@ export interface AugmentedData {
   PORT: Port
   ADDRESS?: Address
 
-
-
   //here are some timestamps we can add to learn more about the time it takes for a TX
   //to move through the system
-  //sendTime : timestamp of when we receive the TX
 
-  //not certain we have a great way to connect these yet 
-  //receivedTime: timestamp of then we got the message
-  //responseTime:  if this is a response we can log when did we send the response
+  /** timestamp of when we receive the TX */
+  sendTime: number 
+  /** timestamp of then we got the message */
+  receivedTime: number 
+  /** if this is a response we can log when did we send the response */
+  replyTime: number
+  /** the time when we receive a response */
+  replyReceivedTime: number
 
-  //should have on option to log aug data for every incoming and outgoing message
+  /** 
+   *  this will show if the message is a ask, tell, or resp
+   *  in shardus net we call send() in two locations.  the ask will use a callback and timeout handler 
+   *  that it will resolve
+   *  The one way send will not set these handlers.
+   *  if we are listening and need to reply to a message then we use _sendAug (with no callback)
+   *  do we need to put the message type in aug data? that could help in cases where the uuid is gone.
+   */
+  msgDir: 'ask' | 'tell' | 'resp'
+}
+
+/**
+ * long info and timers for our message
+ * @param augData 
+ * @param stringifiedData 
+ * @param sending 
+ * @param receivedTime 
+ */
+function logMessageInfo(augData: AugmentedData, stringifiedData:string, sending:boolean = true, receivedTime:number = 0) {
+  //first 50 chars of the message
+  let logData = stringifiedData.slice(0, 50) 
+  let sendingStr = (sending)?'sending': 'receiving'
+  let logMsg = `netmsglog: ${sendingStr} ${augData.msgDir}: ${logData} UUID: ${augData.UUID} PORT: ${augData.PORT} ADDRESS: ${augData.ADDRESS}`
+  
+  if(augData.msgDir === 'tell'){
+    //log timestamps for sendTime
+    logMsg += ` sendTime:${augData.sendTime}`
+    if (sending === false) {
+      logMsg += ` recvTime:${receivedTime} recvDelta:${receivedTime - augData.sendTime}`
+    }
+  } else if( augData.msgDir === 'ask') {
+    logMsg += ` sendTime:${augData.sendTime}`
+    if (sending === false) {
+      logMsg += ` recvTime:${receivedTime} recvDelta:${receivedTime - augData.sendTime}`
+    }
+  } else if(augData.msgDir === 'resp') {
+    //reply delta is interesting as it is the time needed for the software to get the reply ready
+    logMsg += ` sendTime:${augData.sendTime} replyTime:${augData.replyTime} replyDelta:${augData.replyTime - augData.receivedTime} `
+    if (sending === false) {
+      logMsg += ` recvTime:${receivedTime} recvDelta:${receivedTime - augData.sendTime}`
+      logMsg += ` replyReceivedTime:${augData.replyReceivedTime} replyReceivedDelta:${receivedTime - augData.replyReceivedTime}`
+    }
+  }
+  
+  console.log(logMsg)
 }
 
 export interface RemoteSender {
@@ -79,6 +125,9 @@ export type SnOpts = {
   }
   customStringifier?: (val: any) => string
 }
+
+
+
 
 //TODO_HEADERS we the ability to change if sending with headers is enabled.
 //new nodes will rotate in with the ability to do so, but we will need to let shardeum
@@ -152,6 +201,9 @@ export const Sn = (opts: SnOpts) => {
     } else {
       stringifiedData = JSON.stringify(augData)
     }
+
+    logMessageInfo(augData, stringifiedData)
+
     return new Promise<void>((resolve, reject) => {
       _net.send(port, address, stringifiedData, (error) => {
         if (error) {
@@ -227,6 +279,11 @@ export const Sn = (opts: SnOpts) => {
     //TODO_HEADERS sending a port and address seems wrong here!! the response should come back over the existing socket
     //seems like this was written as if we are udp
 
+    let msgDir: 'ask' | 'tell' = 'ask'
+    if(onResponse === noop){
+      msgDir='tell'
+    } 
+
     // Under the hood, sn needs to pass around some extra data for its own internal usage.
     const augData: AugmentedData = {
       data, // the user's data
@@ -234,7 +291,11 @@ export const Sn = (opts: SnOpts) => {
       PORT, // the listening port,    so the library knows to whom to send "responses" to
       ADDRESS, // the listening address, although the library will use the address it got from the network
 
-                                                                        
+      sendTime: Date.now(),
+      receivedTime: 0, 
+      replyTime: 0,
+      replyReceivedTime: 0, 
+      msgDir                                                                    
     }
 
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
@@ -249,16 +310,36 @@ export const Sn = (opts: SnOpts) => {
     const extractUUIDHandleData = (augDataStr: string, remote: RemoteSender) => {
       // [TODO] Secure this with validation
       let augData: AugmentedData = JSON.parse(augDataStr, base64BufferReviver)
+      
+      //here we will log the received message.  note we exploit an aspect of augData 
+      //that the data part is the first value and will be close enough to the start ot the string
+      //to save us from an expensive re-stringify just to get log data of the message
+      logMessageInfo(augData, augDataStr, false, Date.now())
+      
       const { PORT, UUID, data } = augData
       const address = remote.address
 
+      const receivedTime = Date.now()
       // This is the return send function. A user will call this if they want
       // to "reply" or "respond" to an incoming message.
       const respond: ResponseCallback = (data: unknown) => {
 
         //we can do some timestamp work here for better logging.
+        const replyTime = Date.now()
+        const sendData = { 
+          data, 
+          UUID, 
+          PORT,
+          ADDRESS: undefined,
+          sendTime: augData.sendTime,
+          receivedTime, 
+          replyTime,
+          replyReceivedTime: 0, 
+          msgDir: 'resp'
+        }
 
-        const sendData = { data, UUID, PORT }
+        //this is a "response"
+
         //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)
         // @TODO: This error should be properly propagated and logged.
         return _sendAug(PORT, address, sendData, 0, noop, noop).catch(console.error)
