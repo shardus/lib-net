@@ -44,7 +44,7 @@ const main = async () => {
     const inputs = data.toString().trim().split(' ')
     if (inputs.length === 3) {
       const message = inputs[2]
-      await sn.send(+inputs[1], '127.0.0.1', { message, fromPort: +port })
+      await sn.send(+inputs[1], '127.0.0.1', { message, fromPort: +port }, 1000)
       console.log('Message sent')
     } else if (inputs.length === 2) {
       sn.evictSocket(+inputs[1], '127.0.0.1')
@@ -55,15 +55,20 @@ const main = async () => {
     }
   })
 
-  sn.listen((data: any, remote, respond) => {
+  sn.listen(async (data: any, remote, respond) => {
     if (data && data.message === 'ping') {
       console.log('Received ping from:', data.fromPort)
+      // await sleep(10000)
       return respond({ message: 'pong', fromPort: +port })
     }
     if (data && data.message === 'pong') {
       console.log('Received pong from:', data.fromPort)
     }
   })
+}
+
+const sleep = (ms: number) => {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 main().catch((err) => console.log('ERROR: ', err))
