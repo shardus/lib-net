@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto'
+
 export class Histogram<T> {
   private buckets: Map<string, number>
 
@@ -33,20 +35,22 @@ export class Histogram<T> {
     }
   }
 
-  printHistogram() {
+  printHistogram(name = 'Histogram') {
+    const printId = randomUUID()
+    console.log(`\n${name} - ${printId}`)
     for (const [bucket, count] of this.buckets.entries()) {
-      console.log(`${bucket}: ${count}`)
+      console.log(`\t- ${bucket}: ${count} (${printId})})`)
     }
   }
 }
 
-export const NewNumberHistogram = (bucketRanges: number[]) => {
+export const NewNumberHistogram = (name: string, bucketRanges: number[]) => {
   const histogram = new Histogram<number>(bucketRanges, (value, rangeStart, rangeEnd) => {
     return value >= rangeStart && value < rangeEnd
   })
 
   setInterval(() => {
-    histogram.printHistogram()
+    histogram.printHistogram(name)
     histogram.clearHistogram()
   }, 2 * 60 * 1000)
 

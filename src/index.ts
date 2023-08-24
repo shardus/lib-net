@@ -100,7 +100,10 @@ export const Sn = (opts: SnOpts) => {
     requestCreatedAt: number
   }>()
 
-  const histogram = NewNumberHistogram([0, 5, 10, 20, 40, 60])
+  const histogram = NewNumberHistogram(
+    '[stats] Shardus net request times - histogram (seconds)',
+    [0, 5, 10, 20, 40, 60]
+  )
 
   const retainTimedOutEntriesForMillis = 1000 * 60
 

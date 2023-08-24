@@ -1,6 +1,7 @@
 interface TTLMapValue<T> {
   value: T
   expiry: number
+  timeoutId?: NodeJS.Timeout
 }
 
 type OnExpiryCallback<T> = (key: string, value: T) => void
@@ -10,13 +11,13 @@ class TTLMap<T> {
 
   public set(key: string, value: T, ttl: number, onExpiry?: OnExpiryCallback<T>): void {
     const expiry = Date.now() + ttl
-    this.map[key] = { value, expiry }
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (onExpiry) {
         onExpiry(key, value)
       }
       delete this.map[key]
     }, ttl)
+    this.map[key] = { value, expiry, timeoutId }
   }
 
   public get(key: string): T | undefined {
@@ -29,6 +30,10 @@ class TTLMap<T> {
   }
 
   public delete(key: string): void {
+    const entry = this.map[key]
+    if (entry && entry.timeoutId) {
+      clearTimeout(entry.timeoutId)
+    }
     delete this.map[key]
   }
 }
