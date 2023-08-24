@@ -87,7 +87,19 @@ export const Sn = (opts: SnOpts) => {
   const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE)
 
   // we're going to keep track of response IDs here
-  const responseUUIDMapping: { [uuid: string]: (data: unknown) => void } = {}
+  const responseUUIDMapping: {
+    [uuid: string]: {
+      callback: (data: unknown) => void
+      timestamp: number
+    }
+  } = {}
+
+  const timedOutUUIDMapping = new TTLMap<{
+    timedOutAt: number
+    requestCreatedAt: number
+  }>()
+
+  const retainTimedOutEntriesFor = 1000 * 60
 
   const _sendAug = async (
     port: number,
@@ -115,13 +127,27 @@ export const Sn = (opts: SnOpts) => {
       // a timeout of 0 means no return message is expected.
       if (timeout !== 0) {
         const timer = setTimeout(() => {
+          const mapping = responseUUIDMapping[augData.UUID]
+          timedOutUUIDMapping.set(
+            augData.UUID,
+            {
+              timedOutAt: Date.now(),
+              requestCreatedAt: mapping !== undefined ? mapping.timestamp : 0,
+            },
+            retainTimedOutEntriesFor
+          )
+          /* prettier-ignore */ console.log(`_sendAug: request id ${augData.UUID}: timed out after ${Date.now() - mapping.timestamp}ms`)
+          /* prettier-ignore */ console.log(`_sendAug: request id ${augData.UUID}: detailed aug data: ${JSON.stringify(augData)}`)
           delete responseUUIDMapping[augData.UUID]
           onTimeout()
         }, timeout)
 
-        responseUUIDMapping[augData.UUID] = (data: unknown) => {
-          clearTimeout(timer)
-          onResponse(data)
+        responseUUIDMapping[augData.UUID] = {
+          callback: (data: unknown) => {
+            clearTimeout(timer)
+            onResponse(data)
+          },
+          timestamp: Date.now(),
         }
       }
     })
@@ -171,7 +197,22 @@ export const Sn = (opts: SnOpts) => {
 
       // If we are expecting a response, go through the respond mechanism.
       // Otherwise, it's a normal incoming message.
-      const handle = responseUUIDMapping[UUID] ? responseUUIDMapping[UUID] : handleData
+      const handle = responseUUIDMapping[UUID] ? responseUUIDMapping[UUID].callback : handleData
+
+      if (responseUUIDMapping[UUID]) {
+        /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message found in responseUUIDMapping`)
+        /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time take for operation ${Date.now() - responseUUIDMapping[UUID].timestamp}ms`)
+      } else {
+        /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message not found in responseUUIDMapping`)
+        if (timedOutUUIDMapping.get(UUID)) {
+          /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message was found in timedOutUUIDMapping`)
+          const entry = timedOutUUIDMapping.get(UUID)
+          if (entry != undefined) {
+            /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message was found in timedOutUUIDMapping, timed out at ${entry.timedOutAt}, request created at ${entry.requestCreatedAt}, response received at ${Date.now()}`)
+            /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time taken for operation ${Date.now() - entry.requestCreatedAt}ms`)
+          }
+        }
+      }
 
       // Clear the respond mechanism.
       delete responseUUIDMapping[UUID]
