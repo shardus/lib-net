@@ -37,10 +37,13 @@ export class Histogram<T> {
 
   printHistogram(name = 'Histogram') {
     const printId = randomUUID()
-    console.log(`\n${name} - ${printId}`)
+    let logMessage = `\n${name}\n`
+
     for (const [bucket, count] of this.buckets.entries()) {
-      console.log(`\t- ${bucket}: ${count} (${printId}))`)
+      logMessage += `\t- ${bucket}: ${count}\n`
     }
+
+    console.log(logMessage)
   }
 }
 
