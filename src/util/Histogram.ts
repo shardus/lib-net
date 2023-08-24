@@ -39,7 +39,7 @@ export class Histogram<T> {
     const printId = randomUUID()
     console.log(`\n${name} - ${printId}`)
     for (const [bucket, count] of this.buckets.entries()) {
-      console.log(`\t- ${bucket}: ${count} (${printId})})`)
+      console.log(`\t- ${bucket}: ${count} (${printId}))`)
     }
   }
 }
