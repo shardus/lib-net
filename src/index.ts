@@ -1,5 +1,6 @@
 import * as uuid from 'uuid/v1'
 import validate from './opts'
+import { NewNumberHistogram } from './util/Histogram'
 const net = require('../../shardus-net.node')
 
 const DEFAULT_ADDRESS = '0.0.0.0'
@@ -87,7 +88,24 @@ export const Sn = (opts: SnOpts) => {
   const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE)
 
   // we're going to keep track of response IDs here
-  const responseUUIDMapping: { [uuid: string]: (data: unknown) => void } = {}
+  const responseUUIDMapping: {
+    [uuid: string]: {
+      callback: (data: unknown) => void
+      timestamp: number
+    }
+  } = {}
+
+  const timedOutUUIDMapping = new TTLMap<{
+    timedOutAt: number
+    requestCreatedAt: number
+  }>()
+
+  const histogram = NewNumberHistogram(
+    '[stats] Shardus net request times - histogram (seconds)',
+    [0, 5, 10, 20, 40, 60]
+  )
+
+  const retainTimedOutEntriesForMillis = 1000 * 60
 
   const _sendAug = async (
     port: number,
@@ -115,13 +133,31 @@ export const Sn = (opts: SnOpts) => {
       // a timeout of 0 means no return message is expected.
       if (timeout !== 0) {
         const timer = setTimeout(() => {
+          const mapping = responseUUIDMapping[augData.UUID]
+          timedOutUUIDMapping.set(
+            augData.UUID,
+            {
+              timedOutAt: Date.now(),
+              requestCreatedAt: mapping !== undefined ? mapping.timestamp : 0,
+            },
+            retainTimedOutEntriesForMillis,
+            (key, value) => {
+              /* prettier-ignore */ console.log(`_sendAug: request id ${key}: expired from timedOutUUIDMapping at ${value.timedOutAt}, request created at ${value.requestCreatedAt}}`)
+              histogram.logData((Date.now() - value.requestCreatedAt) / 1000)
+            }
+          )
+          /* prettier-ignore */ console.log(`_sendAug: request id ${augData.UUID}: timed out after ${Date.now() - mapping.timestamp}ms`)
+          /* prettier-ignore */ console.log(`_sendAug: request id ${augData.UUID}: detailed aug data: ${JSON.stringify(augData)}`)
           delete responseUUIDMapping[augData.UUID]
           onTimeout()
         }, timeout)
 
-        responseUUIDMapping[augData.UUID] = (data: unknown) => {
-          clearTimeout(timer)
-          onResponse(data)
+        responseUUIDMapping[augData.UUID] = {
+          callback: (data: unknown) => {
+            clearTimeout(timer)
+            onResponse(data)
+          },
+          timestamp: Date.now(),
         }
       }
     })
@@ -171,7 +207,25 @@ export const Sn = (opts: SnOpts) => {
 
       // If we are expecting a response, go through the respond mechanism.
       // Otherwise, it's a normal incoming message.
-      const handle = responseUUIDMapping[UUID] ? responseUUIDMapping[UUID] : handleData
+      const handle = responseUUIDMapping[UUID] ? responseUUIDMapping[UUID].callback : handleData
+
+      if (responseUUIDMapping[UUID]) {
+        /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message found in responseUUIDMapping`)
+        /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time take for operation ${Date.now() - responseUUIDMapping[UUID].timestamp}ms`)
+        histogram.logData((Date.now() - responseUUIDMapping[UUID].timestamp) / 1000)
+      } else {
+        /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message not found in responseUUIDMapping`)
+        const entry = timedOutUUIDMapping.get(UUID)
+        if (entry != undefined) {
+          /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message was found in timedOutUUIDMapping`)
+          if (entry != undefined) {
+            /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message was found in timedOutUUIDMapping, timed out at ${entry.timedOutAt}, request created at ${entry.requestCreatedAt}, response received at ${Date.now()}`)
+            /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time taken for operation ${Date.now() - entry.requestCreatedAt}ms`)
+          }
+          histogram.logData((Date.now() - entry.requestCreatedAt) / 1000)
+          timedOutUUIDMapping.delete(UUID)
+        }
+      }
 
       // Clear the respond mechanism.
       delete responseUUIDMapping[UUID]
