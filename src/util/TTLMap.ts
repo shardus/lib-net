@@ -1,12 +1,12 @@
-interface TTLMapValue<T> {
+export interface TTLMapValue<T> {
   value: T
   expiry: number
   timeoutId?: NodeJS.Timeout
 }
 
-type OnExpiryCallback<T> = (key: string, value: T) => void
+export type OnExpiryCallback<T> = (key: string, value: T) => void
 
-class TTLMap<T> {
+export class TTLMap<T> {
   private readonly map: { [key: string]: TTLMapValue<T> } = {}
 
   public set(key: string, value: T, ttl: number, onExpiry?: OnExpiryCallback<T>): void {

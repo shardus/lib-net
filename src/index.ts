@@ -1,6 +1,7 @@
 import * as uuid from 'uuid/v1'
 import validate from './opts'
 import { NewNumberHistogram } from './util/Histogram'
+import { TTLMap } from './util/TTLMap'
 const net = require('../../shardus-net.node')
 
 const DEFAULT_ADDRESS = '0.0.0.0'
