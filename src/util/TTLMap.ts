@@ -3,13 +3,18 @@ interface TTLMapValue<T> {
   expiry: number
 }
 
+type OnExpiryCallback<T> = (key: string, value: T) => void
+
 class TTLMap<T> {
   private readonly map: { [key: string]: TTLMapValue<T> } = {}
 
-  public set(key: string, value: T, ttl: number): void {
+  public set(key: string, value: T, ttl: number, onExpiry?: OnExpiryCallback<T>): void {
     const expiry = Date.now() + ttl
     this.map[key] = { value, expiry }
     setTimeout(() => {
+      if (onExpiry) {
+        onExpiry(key, value)
+      }
       delete this.map[key]
     }, ttl)
   }
