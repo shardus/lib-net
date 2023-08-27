@@ -1,10 +1,16 @@
 [package]
-name = "my_project"
+name = "shardus_net"
 version = "1.0.2"
 license = "ISC"
 edition = "2018"
+# exclude = ["index.node"]
 
-# Other project metadata like authors, description, etc.
+[lib]
+crate-type = ["cdylib"]
+# name = "shardus_net"
+# path = "src/lib.rs"
+
+
 [dependencies]
 tokio = { version = "1.13", features = ["io-util", "sync", "net", "rt-multi-thread", "time"] }
 neon = { version = "0.9", default-features = false, features = ["napi-6", "channel-api"] }
@@ -14,16 +20,3 @@ thiserror = "1.0"
 log = "0.4"
 simplelog = "^0.10.0"
 lru = "0.10.0"
-
-[lib]
-# path = "shardus_net/src/lib.rs"
-
-
-[workspace]
-members = ["shardus_net",]
-
-# add a workspace member for shardus_net
-
-
-
-
