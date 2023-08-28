@@ -12,6 +12,8 @@ crate-type = ["cdylib"]
 
 
 [dependencies]
+parse_core = { path = "../parse_core" } 
+bespoke_binary = { path = "../bespoke_binary" } 
 tokio = { version = "1.13", features = ["io-util", "sync", "net", "rt-multi-thread", "time"] }
 neon = { version = "0.9", default-features = false, features = ["napi-6", "channel-api"] }
 once_cell = "1.8"
@@ -20,3 +22,5 @@ thiserror = "1.0"
 log = "0.4"
 simplelog = "^0.10.0"
 lru = "0.10.0"
+# our libraries
+

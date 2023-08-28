@@ -65,6 +65,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bespoke_binary"
+version = "1.0.2"
+
+[[package]]
 name = "bumpalo"
 version = "3.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -327,6 +331,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "parse_core"
+version = "1.0.2"
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -375,11 +383,13 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "shardus_net"
 version = "1.0.2"
 dependencies = [
+ "bespoke_binary",
  "log",
  "lru",
  "neon",
  "once_cell",
  "owning_ref",
+ "parse_core",
  "simplelog",
  "thiserror",
  "tokio",

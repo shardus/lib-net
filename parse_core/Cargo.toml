@@ -1,0 +1,9 @@
+[package]
+name = "parse_core"
+version = "1.0.2"
+edition = "2018"
+
+# Other crate-specific metadata
+
+[lib]
+# crate-type = ["cdylib"]

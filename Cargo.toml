@@ -20,7 +20,7 @@ lru = "0.10.0"
 
 
 [workspace]
-members = ["shardus_net",]
+members = ["bespoke_binary", "parse_core", "shardus_net"]
 
 # add a workspace member for shardus_net
 
