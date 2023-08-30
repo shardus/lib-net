@@ -2,3 +2,9 @@
 name = "bespoke_binary"
 version = "1.0.2"
 edition = "2018"
+
+
+[dev-dependencies]
+# This is where you specify testing-related dependencies
+# For example, we'll add the `assert_approx_eq` crate for floating-point comparisons
+assert_approx_eq = "1.1.0"

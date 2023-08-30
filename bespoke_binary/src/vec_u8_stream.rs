@@ -1,12 +1,12 @@
-pub struct CustomBuffer {
+pub struct VecU8Stream {
     data: Vec<u8>,
     pub cursor: usize,
 }
 
-impl CustomBuffer {
+impl VecU8Stream {
     #[allow(dead_code)]
     pub fn new(data: Vec<u8>) -> Self {
-        CustomBuffer { data, cursor: 0 }
+        VecU8Stream { data, cursor: 0 }
     }
 
     #[allow(dead_code)]
