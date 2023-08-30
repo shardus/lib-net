@@ -12,7 +12,7 @@
   "scripts": {
     "build": "npm run build-rust-release && npm run build-node",
     "build-node": "tsc -p .",
-    "build-rust": "cargo-cp-artifact --artifact cdylib shardus-net shardus-net.node -- cargo build --message-format=json-render-diagnostics",
+    "build-rust": "cargo-cp-artifact --artifact cdylib shardus_net shardus-net.node -- cargo build --message-format=json-render-diagnostics",
     "build-rust-debug": "npm run build-rust --",
     "build-rust-release": "npm run build-rust -- --release",
     "compile": "npm run build-node",

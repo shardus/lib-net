@@ -1,29 +1,2 @@
-[package]
-name = "my_project"
-version = "1.0.2"
-license = "ISC"
-edition = "2018"
-
-# Other project metadata like authors, description, etc.
-[dependencies]
-tokio = { version = "1.13", features = ["io-util", "sync", "net", "rt-multi-thread", "time"] }
-neon = { version = "0.9", default-features = false, features = ["napi-6", "channel-api"] }
-once_cell = "1.8"
-owning_ref = "0.4"
-thiserror = "1.0"
-log = "0.4"
-simplelog = "^0.10.0"
-lru = "0.10.0"
-
-[lib]
-# path = "shardus_net/src/lib.rs"
-
-
 [workspace]
 members = ["bespoke_binary", "parse_core", "shardus_net"]
-
-# add a workspace member for shardus_net
-
-
-
-

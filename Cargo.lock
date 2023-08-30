@@ -233,20 +233,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "my_project"
-version = "1.0.2"
-dependencies = [
- "log",
- "lru",
- "neon",
- "once_cell",
- "owning_ref",
- "simplelog",
- "thiserror",
- "tokio",
-]
-
-[[package]]
 name = "neon"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
