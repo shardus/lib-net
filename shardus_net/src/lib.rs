@@ -17,6 +17,9 @@ mod shardus_net_listener;
 mod shardus_net_sender;
 mod stats;
 
+mod header_factory;
+pub mod headers;
+
 use ring_buffer::Stats as RingBufferStats;
 use runtime::RUNTIME;
 use shardus_net_listener::ShardusNetListener;

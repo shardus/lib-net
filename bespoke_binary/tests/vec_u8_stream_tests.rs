@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    // use super::*;
     use bespoke_binary::VecU8Stream;
 
     #[test]

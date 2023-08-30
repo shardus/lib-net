@@ -2,6 +2,7 @@ import * as uuid from 'uuid/v1'
 import validate from './opts'
 import { NewNumberHistogram } from './util/Histogram'
 import { TTLMap } from './util/TTLMap'
+import { Headers } from './headers'
 const net = require('../../shardus-net.node')
 
 const DEFAULT_ADDRESS = '0.0.0.0'
@@ -140,24 +141,12 @@ export type SnOpts = {
     useLruCache?: boolean
     lruSize: number
   }
+  headerOpts?: {
+    sendWithHeaders: boolean
+    sendHeaderVersion: number
+  }
   customStringifier?: (val: any) => string
 }
-
-//TODO_HEADERS we the ability to change if sending with headers is enabled.
-//new nodes will rotate in with the ability to do so, but we will need to let shardeum
-//migration control when this feature becomes active.
-//basically needs some an exposed method to allow setting this flag
-//receiving either type of message is non breaking if we do it right.
-
-// We have to generate a closure so,
-// 1) We can test simulated from two isolated environments, and
-// 2) Users can use two distinct copies if they want to, for whatever
-//    reason.
-//
-// We need to pass in the port and address to the whole closure so that
-// the `send` function can augment its sent data with the port the `listen`
-// function will be listening on. This is necessary to simulate "responding"
-// to a "request".
 
 export const Sn = (opts: SnOpts) => {
   validate(opts)
@@ -166,6 +155,11 @@ export const Sn = (opts: SnOpts) => {
   const ADDRESS = opts.address || DEFAULT_ADDRESS
   const USE_LRU_CACHE = (opts.senderOpts && opts.senderOpts.useLruCache) || false
   const LRU_SIZE = (opts.senderOpts && opts.senderOpts.lruSize) || 1028
+
+  const HEADER_OPTS = opts.headerOpts || {
+    sendWithHeaders: false,
+    sendHeaderVersion: 0,
+  }
 
   const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE)
 
@@ -267,11 +261,37 @@ export const Sn = (opts: SnOpts) => {
     })
   }
 
-  //TODO_HEADERS create a new _sendWithHeaders function that can send data with a header object.
-  //We will use versioned binary headers but that will be handled in rust.
-  //The data passed in for the message should be a json object.  initially this will still use
-  //JSON, but some messages will get converted to binary most likely on the rust side of things for
-  //performance reasons, but we will need to test this.
+  const sendWithHeaders = async (
+    port: number,
+    address: string,
+    data: unknown,
+    timeout = 0,
+    headers: Headers = {},
+    onResponse: ResponseCallback = noop,
+    onTimeout: TimeoutCallback = noop
+  ) => {
+    const UUID = uuid()
+
+    let msgDir: 'ask' | 'tell' = 'ask'
+    if (onResponse === noop) {
+      msgDir = 'tell'
+    }
+
+    const augData: AugmentedData = {
+      data, // the user's data
+      UUID, // the ID we'll use to determine whether requests were "responded to"
+      PORT, // the listening port,    so the library knows to whom to send "responses" to
+      ADDRESS, // the listening address, although the library will use the address it got from the network
+
+      sendTime: Date.now(),
+      receivedTime: 0,
+      replyTime: 0,
+      replyReceivedTime: 0,
+      msgDir,
+    }
+
+    return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
+  }
 
   // TODO_HEADERS I think we may need to send asks in the future with a node ID as well if we want to check
   // for an already existing socket connection
@@ -413,9 +433,14 @@ export const Sn = (opts: SnOpts) => {
     return _net.stopListening(server)
   }
 
+  const updateHeaderOpts = (opts: { sendWithHeaders: boolean; sendHeaderVersion: number }) => {
+    HEADER_OPTS.sendWithHeaders = opts.sendWithHeaders
+    HEADER_OPTS.sendHeaderVersion = opts.sendHeaderVersion
+  }
+
   const stats = () => _net.stats()
 
-  const returnVal = { send, listen, stopListening, stats, evictSocket }
+  const returnVal = { send, listen, stopListening, stats, evictSocket, updateHeaderOpts }
 
   return returnVal
 }

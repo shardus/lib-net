@@ -29,3 +29,4 @@ thiserror = "1.0"
 log = "0.4"
 simplelog = "^0.10.0"
 lru = "0.10.0"
+uuid = { version = "0.8", features = ["v4"] }
