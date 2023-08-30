@@ -10,7 +10,7 @@
     "Cargo.*"
   ],
   "scripts": {
-    "build": "npm run build-rust-release && npm run build-node",
+    "build": "npm run build-rust && npm run build-node",
     "build-node": "tsc -p .",
     "build-rust": "cargo-cp-artifact --artifact cdylib shardus_net shardus-net.node -- cargo build --message-format=json-render-diagnostics",
     "build-rust-debug": "npm run build-rust --",

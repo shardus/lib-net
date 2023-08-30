@@ -27,17 +27,6 @@ use stats::{Incrementers, Stats, StatsResult};
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 
-// extern crate parse_core; //this fails too
-// use parse_core;
-
-//use bespoke_binary::get_hello_message;
-use parse_core::get_hello_message;
-
-// fn main() {
-//     let hello_message = get_hello_message();
-//     println!("{}", hello_message);
-// }
-
 use crate::shardus_net_sender::Connection;
 
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
@@ -72,9 +61,6 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     shardus_net.set(cx, "send", send)?;
     shardus_net.set(cx, "evict_socket", evict_socket)?;
     shardus_net.set(cx, "stats", get_stats)?;
-
-    let hello_message = get_hello_message();
-    println!("{}", hello_message);
 
     Ok(shardus_net)
 }
@@ -323,13 +309,10 @@ fn to_stats_object<'a>(cx: &mut impl Context<'a>, long_term_max: f64, long_term_
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    let hello_message = get_hello_message();
-    println!("2 {}", hello_message);
-
-    let hello2 = bespoke_binary::get_hello_message();
-    println!("3 {}", hello2);
-
     SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
+
+    info!("{}", bespoke_binary::get_hello_message());
+    info!("{}", parse_core::get_hello_message());
 
     cx.export_function("Sn", create_shardus_net)?;
 

@@ -12,9 +12,7 @@ impl CustomBuffer {
     #[allow(dead_code)]
     pub fn read<T: std::marker::Copy>(&mut self) -> Option<T> {
         if self.cursor + std::mem::size_of::<T>() <= self.data.len() {
-            let value: T = unsafe {
-                std::ptr::read(self.data.as_ptr().offset(self.cursor as isize) as *const T)
-            };
+            let value: T = unsafe { std::ptr::read(self.data.as_ptr().offset(self.cursor as isize) as *const T) };
             self.cursor += std::mem::size_of::<T>();
             Some(value)
         } else {
@@ -24,9 +22,7 @@ impl CustomBuffer {
 
     #[allow(dead_code)]
     pub fn write<T: std::marker::Copy>(&mut self, value: T) {
-        let value_bytes: &[u8] = unsafe {
-            std::slice::from_raw_parts(&value as *const T as *const u8, std::mem::size_of::<T>())
-        };
+        let value_bytes: &[u8] = unsafe { std::slice::from_raw_parts(&value as *const T as *const u8, std::mem::size_of::<T>()) };
         self.data.extend_from_slice(value_bytes);
     }
 
@@ -83,12 +79,3 @@ impl CustomBuffer {
         Some(result)
     }
 }
-
-// pub mod custombuffer {
-//     pub use super::CustomBuffer;
-// }
-
-//add a main function
-// fn main() {
-//     println!("Hello, world!");
-// }
