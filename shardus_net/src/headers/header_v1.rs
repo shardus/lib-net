@@ -75,6 +75,13 @@ impl HeaderV1 {
             authorization_data,
         })
     }
+
+    pub fn validate(&self, message: Vec<u8>) -> bool {
+        if message.len() != self.message_length as usize {
+            return false;
+        }
+        true
+    }
 }
 
 #[cfg(test)]

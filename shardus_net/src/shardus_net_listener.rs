@@ -1,6 +1,9 @@
+use crate::header_factory::header_deserialize_factory;
+
 use super::runtime::RUNTIME;
 
 use log::{error, info};
+use std::io::Cursor;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::string::FromUtf8Error;
 use thiserror::Error;
@@ -102,8 +105,30 @@ impl ShardusNetListener {
 
             // TODO_HEADERS: we need to keep this message in buffer (vec<U8>) form longer until we get to
             // code that parses the different kinds of messages.
-            let msg = String::from_utf8(buffer)?;
-            received_msg_tx.send((msg, remote_addr)).map_err(|_| SendError(()))?;
+
+            if !buffer.is_empty() && buffer[0] == 0x1 {
+                // Header is present
+                let header_version = buffer[1];
+                let msg_bytes = &buffer[2..];
+
+                let cursor = Cursor::new(msg_bytes);
+                let header = header_deserialize_factory(header_version, cursor.get_ref().to_vec()).expect("Failed to deserialize header");
+                let header_length = cursor.position() as usize;
+
+                let remaining_msg_bytes = &msg_bytes[header_length..];
+                if header.validate(remaining_msg_bytes.to_vec()) == false {
+                    error!("Failed to validate header");
+                    continue;
+                }
+
+                // deserialize remaining bytes as your message
+                let msg = String::from_utf8(remaining_msg_bytes.to_vec())?;
+                received_msg_tx.send((msg, remote_addr)).map_err(|_| SendError(()))?;
+            } else {
+                // No header present
+                let msg = String::from_utf8(buffer)?;
+                received_msg_tx.send((msg, remote_addr)).map_err(|_| SendError(()))?;
+            }
         }
 
         Ok(())
