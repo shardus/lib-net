@@ -6,13 +6,11 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{net::ToSocketAddrs, sync::Arc};
 
+use headers::header_v1::HeaderV1;
 use log::info;
 use log::LevelFilter;
 use lru::LruCache;
 use neon::{prelude::*, result::Throw};
-use serde_derive::Deserialize;
-use serde_derive::Serialize;
-
 
 mod ring_buffer;
 mod runtime;
@@ -32,56 +30,24 @@ use simplelog::{Config, SimpleLogger};
 use stats::{Incrementers, Stats, StatsResult};
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 use crate::shardus_net_sender::Connection;
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AugmentedData {
-    pub data: serde_json::Value,
-    pub port: u64,
-    pub send_time: u64,
-    pub received_time: u64,
-    pub reply_time: u64,
-    pub reply_received_time: u64,
- 
-}
 
 
 pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
-    let data_js: Handle<JsValue> = cx.argument(0)?;
-    let data_value: serde_json::Value = neon_serde::from_value(cx, data_js)?;
+    let host: String = cx.argument::<JsString>(0)?.value(cx) as String;
     let port: u16 = cx.argument::<JsNumber>(1)?.value(cx) as u16;
-    let timeout: i64 = cx.argument::<JsNumber>(2)?.value(cx) as i64;
-    let header_version: u8 = cx.argument::<JsNumber>(3)?.value(cx) as u8;
-    let headers: Handle<JsObject> = cx.argument(4)?;
-    let complete_cb = cx.argument::<JsFunction>(5)?.root(cx);
+    let header_version: u8 = cx.argument::<JsNumber>(2)?.value(cx) as u8;
+    let mut header: Handle<JsObject> = cx.argument(3)?;
+    let data: String = cx.argument::<JsString>(4)?.value(cx) as String;
+    let timeout: i64 = cx.argument::<JsNumber>(5)?.value(cx) as i64;
+    let complete_cb = cx.argument::<JsFunction>(6)?.root(cx);
     
     let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
     let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
-
-    println!("data_value: {:?}", data_value);
-    println!("port: {}", port);
-    println!("timeout: {}", timeout);
-    println!("header_version: {}", header_version);
-    println!("headers: {:?}", headers);
  
-
-    let aug_data = AugmentedData {
-        data: data_value,
-        port: port,
-        send_time: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64,
-        received_time: 0,
-        reply_time: 0,
-        reply_received_time: 0
-    };
-
-    println!("aug_data: {:?}", aug_data);
-
-    let host = headers.sender_address;
 
     let this = cx.this().root(cx);
     let channel = cx.channel();
@@ -89,25 +55,65 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
     stats_incrementers.increment_outstanding_sends();
 
+    //----------------------------
+    //FIND A WAY TO DECOUPLE THIS PIECE OF CODE INTO A FUNCTION ONCE WE HONED RUST SKILLS
+    //CONVERT JSOBJECT TO HEADERV1
+    let sender_address_js: Handle<JsArray> = header.get(cx, "sender_address")?.downcast_or_throw::<_,_>(cx)?;
+    let mut sender_address = [0u8; 32];
+    for i in 0..32 {
+        sender_address[i] = sender_address_js.get(cx, i as u32)?.downcast::<JsNumber, _>(cx).or_throw(cx)?.value(cx) as u8;
+    }
+
+    // Extract and convert uuid
+    let uuid_str: String = header.get(cx, "uuid")?.downcast::<JsString, _>(cx).or_throw(cx)?.value(cx);
+    let uuid = match Uuid::parse_str(&uuid_str) {
+        Ok(u) => u,
+        Err(_) => {
+            return cx.throw_error(format!("Invalid UUID: {}", uuid_str));
+        }
+    };
+    // Extract and convert message_type
+    let message_type: u32 = header.get(cx, "message_type")?.downcast::<JsNumber,_>(cx).or_throw(cx)?.value(cx) as u32;
+
+    // Extract and convert message_length
+    let message_length: u32 = header.get(cx, "message_length")?.downcast_or_throw::<JsNumber,_>(cx)?.value(cx) as u32;
+
+    // Extract and convert authorization_data
+    let auth_data_js: Handle<JsArray> = header.get(cx, "authorization_data")?.downcast_or_throw(cx)?;
+    let mut authorization_data = Vec::new();
+    for i in 0..auth_data_js.len(cx) {
+        let byte = auth_data_js.get(cx, i as u32)?.downcast_or_throw::<JsNumber,_>(cx)?.value(cx) as u8;
+        authorization_data.push(byte);
+    }
+
+    let header = HeaderV1 {
+        sender_address,
+        uuid,
+        message_type,
+        message_length,
+        authorization_data,
+    };
+    //------------------------------
+
     RUNTIME.spawn(async move {
         let result = complete_rx.await.expect("Complete send tx dropped before notify");
-
+    
         RUNTIME.spawn_blocking(move || {
             channel.send(move |mut cx| {
                 let cx = &mut cx;
                 let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
                 (**stats).borrow_mut().decrement_outstanding_sends();
-
+    
                 let this = cx.undefined();
                 let mut args = Vec::new();
-
+    
                 if let Err(err) = result {
                     let error = cx.string(format!("{:?}", err));
                     args.push(error);
                 }
-
+    
                 complete_cb.to_inner(cx).call(cx, this, args)?;
-
+    
                 Ok(())
             });
         });
@@ -116,8 +122,8 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     match (host, port as u16).to_socket_addrs() {
         Ok(mut address) => {
             let address = address.next().expect("Expected at least one address");
-            shardus_net_sender.send_with_headers(address, header_version, headers, aug_data, complete_tx);
-
+            shardus_net_sender.send_with_headers(address, header_version, headers::header_types::Header::V1(header), data, complete_tx);
+    
             Ok(cx.undefined())
         }
         Err(_) => cx.throw_type_error("The provided address is not valid"),
@@ -403,6 +409,9 @@ fn to_stats_object<'a>(cx: &mut impl Context<'a>, long_term_max: f64, long_term_
 
     Ok(obj)
 }
+
+
+
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
