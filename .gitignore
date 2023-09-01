@@ -88,3 +88,6 @@ build/
 # Rust build output
 /target
 *.node
+
+# Idea Settings
+.Idea

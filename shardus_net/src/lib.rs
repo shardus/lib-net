@@ -10,6 +10,9 @@ use log::info;
 use log::LevelFilter;
 use lru::LruCache;
 use neon::{prelude::*, result::Throw};
+use serde_derive::Deserialize;
+use serde_derive::Serialize;
+
 
 mod ring_buffer;
 mod runtime;
@@ -32,6 +35,102 @@ use tokio::sync::Mutex;
 
 use crate::shardus_net_sender::Connection;
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AugmentedData {
+    pub data: serde_json::Value,
+    pub port: u64,
+    pub send_time: u64,
+    pub received_time: u64,
+    pub reply_time: u64,
+    pub reply_received_time: u64,
+    pub msg_dir: MsgDir,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum MsgDir {
+    Ask,
+    Tell,
+    Resp,
+}
+
+pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let cx = &mut cx;
+    let data_js: Handle<JsValue> = cx.argument(0)?;
+    let data_value: serde_json::Value = neon_serde::from_value(cx, data_js)?;
+    let port: u16 = cx.argument::<JsNumber>(1)?.value(cx) as u16;
+    let timeout: i64 = cx.argument::<JsNumber>(2)?.value(cx) as i64;
+    let header_version: u8 = cx.argument::<JsNumber>(3)?.value(cx) as u8;
+    let headers: Handle<JsObject> = cx.argument(4)?;
+    let complete_cb = cx.argument::<JsFunction>(5)?.root(cx);
+    
+    let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
+    let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
+
+    println!("data_value: {:?}", data_value);
+    println!("port: {}", port);
+    println!("timeout: {}", timeout);
+    println!("header_version: {}", header_version);
+    println!("headers: {:?}", headers);
+ 
+
+    let aug_data = AugmentedData {
+        data: data_value,
+        port: port,
+        send_time: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64,
+        received_time: 0,
+        reply_time: 0,
+        reply_received_time: 0,
+        msg_dir,
+    };
+
+    println!("aug_data: {:?}", aug_data);
+
+    let host = headers.sender_address;
+
+    let this = cx.this().root(cx);
+    let channel = cx.channel();
+    let (complete_tx, complete_rx) = oneshot::channel::<SendResult>();
+
+    stats_incrementers.increment_outstanding_sends();
+
+    RUNTIME.spawn(async move {
+        let result = complete_rx.await.expect("Complete send tx dropped before notify");
+
+        RUNTIME.spawn_blocking(move || {
+            channel.send(move |mut cx| {
+                let cx = &mut cx;
+                let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+                (**stats).borrow_mut().decrement_outstanding_sends();
+
+                let this = cx.undefined();
+                let mut args = Vec::new();
+
+                if let Err(err) = result {
+                    let error = cx.string(format!("{:?}", err));
+                    args.push(error);
+                }
+
+                complete_cb.to_inner(cx).call(cx, this, args)?;
+
+                Ok(())
+            });
+        });
+    });
+
+    match (host, port as u16).to_socket_addrs() {
+        Ok(mut address) => {
+            let address = address.next().expect("Expected at least one address");
+            shardus_net_sender.send_with_headers(address, header_version, headers, aug_data, complete_tx);
+
+            Ok(cx.undefined())
+        }
+        Err(_) => cx.throw_type_error("The provided address is not valid"),
+    }
+}
+
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
 
@@ -53,6 +152,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
 
     let listen = JsFunction::new(cx, listen)?;
     let send = JsFunction::new(cx, send)?;
+    let sendWithHeaders = JsFunction::new(cx, sendWithHeaders)?;
     let get_stats = JsFunction::new(cx, get_stats)?;
     let evict_socket = JsFunction::new(cx, evict_socket)?;
 
@@ -62,6 +162,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     shardus_net.set(cx, "_stats_incrementers", stats_incrementers)?;
     shardus_net.set(cx, "listen", listen)?;
     shardus_net.set(cx, "send", send)?;
+    shardus_net.set(cx, "sendWithHeaders", sendWithHeaders)?;
     shardus_net.set(cx, "evict_socket", evict_socket)?;
     shardus_net.set(cx, "stats", get_stats)?;
 
