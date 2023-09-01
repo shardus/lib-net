@@ -31,6 +31,22 @@ pub fn header_deserialize_factory(version: u8, serialized_header: Vec<u8>) -> Op
     }
 }
 
+pub fn header_serialize_factory(header_version: u8, header: Header) -> Option<Vec<u8>> {
+    match header_version {
+        1 => match header {
+            Header::V1(header_v1) => Some(header_v1.serialize()),
+        },
+        _ => None,
+    }
+}
+
+pub fn vec_to_hex_string(data: Vec<u8>) -> String {
+    data.iter()
+        .map(|byte| format!("{:02x}", byte))
+        .collect::<Vec<String>>()
+        .join("")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

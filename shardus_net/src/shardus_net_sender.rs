@@ -26,7 +26,7 @@ pub enum SenderError {
 pub type SendResult = Result<(), SenderError>;
 
 pub struct ShardusNetSender {
-    send_channel: UnboundedSender<(SocketAddr, String, Sender<SendResult>)>,
+    send_channel: UnboundedSender<(SocketAddr, Vec<u8>, Sender<SendResult>)>,
     evict_socket_channel: UnboundedSender<SocketAddr>,
 }
 
@@ -42,6 +42,7 @@ impl ShardusNetSender {
     }
 
     pub fn send(&self, address: SocketAddr, data: String, complete_tx: Sender<SendResult>) {
+        let data = data.into_bytes();
         self.send_channel
             .send((address, data, complete_tx))
             .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
@@ -67,7 +68,7 @@ impl ShardusNetSender {
         });
     }
 
-    fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, String, Sender<SendResult>)>, connections: Arc<Mutex<dyn ConnectionCache + Send>>) {
+    fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, Vec<u8>, Sender<SendResult>)>, connections: Arc<Mutex<dyn ConnectionCache + Send>>) {
         RUNTIME.spawn(async move {
             let mut send_channel_rx = send_channel_rx;
 
@@ -78,7 +79,7 @@ impl ShardusNetSender {
                 };
 
                 RUNTIME.spawn(async move {
-                    let result = connection.send(&data).await;
+                    let result = connection.send(data).await;
                     complete_tx.send(result).ok();
                 });
             }
@@ -100,13 +101,13 @@ impl Connection {
         Self { address, socket }
     }
 
-    async fn send(&self, data: &str) -> SendResult {
+    async fn send(&self, data: Vec<u8>) -> SendResult {
         let mut socket = self.socket.lock().await;
         let socket_op = &mut (*socket);
 
         let socket = Self::connect_and_set_socket_if_none(socket_op, self.address).await?;
 
-        let result = Self::write_data_to_stream(socket, data).await;
+        let result = Self::write_data_to_stream(socket, data.clone()).await;
 
         if result.is_err() {
             info!("Failed to send data to {}. Attempting to reconnect and try again.", self.address);
@@ -144,10 +145,10 @@ impl Connection {
         Ok(socket)
     }
 
-    async fn write_data_to_stream(socket: &mut TcpStream, data: &str) -> io::Result<()> {
+    async fn write_data_to_stream(socket: &mut TcpStream, data: Vec<u8>) -> io::Result<()> {
         let len = data.len() as u32;
         socket.write_u32(len).await?;
-        socket.write_all(data.as_bytes()).await
+        socket.write_all(&data).await
     }
 }
 
