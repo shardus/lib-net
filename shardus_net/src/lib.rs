@@ -43,15 +43,9 @@ pub struct AugmentedData {
     pub received_time: u64,
     pub reply_time: u64,
     pub reply_received_time: u64,
-    pub msg_dir: MsgDir,
+ 
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub enum MsgDir {
-    Ask,
-    Tell,
-    Resp,
-}
 
 pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
@@ -82,8 +76,7 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             .as_millis() as u64,
         received_time: 0,
         reply_time: 0,
-        reply_received_time: 0,
-        msg_dir,
+        reply_received_time: 0
     };
 
     println!("aug_data: {:?}", aug_data);
