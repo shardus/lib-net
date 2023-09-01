@@ -152,7 +152,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
 
     let listen = JsFunction::new(cx, listen)?;
     let send = JsFunction::new(cx, send)?;
-    let sendWithHeaders = JsFunction::new(cx, sendWithHeaders)?;
+    let send_with_headers = JsFunction::new(cx, send_with_headers)?;
     let get_stats = JsFunction::new(cx, get_stats)?;
     let evict_socket = JsFunction::new(cx, evict_socket)?;
 
@@ -162,7 +162,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     shardus_net.set(cx, "_stats_incrementers", stats_incrementers)?;
     shardus_net.set(cx, "listen", listen)?;
     shardus_net.set(cx, "send", send)?;
-    shardus_net.set(cx, "sendWithHeaders", sendWithHeaders)?;
+    shardus_net.set(cx, "send_with_headers", send_with_headers)?;
     shardus_net.set(cx, "evict_socket", evict_socket)?;
     shardus_net.set(cx, "stats", get_stats)?;
 
