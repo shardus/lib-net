@@ -1,4 +1,6 @@
 use super::runtime::RUNTIME;
+use crate::header_factory::header_serialize_factory;
+use crate::headers::header_types::Header;
 use crate::oneshot::Sender;
 use log::{error, info};
 use std::collections::HashMap;
@@ -41,11 +43,20 @@ impl ShardusNetSender {
         Self { send_channel, evict_socket_channel }
     }
 
+    // send: send data to a socket address without a header
     pub fn send(&self, address: SocketAddr, data: String, complete_tx: Sender<SendResult>) {
         let data = data.into_bytes();
         self.send_channel
             .send((address, data, complete_tx))
             .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
+    }
+
+    pub fn send_with_headers(&self, address: SocketAddr, header_version: u8, header: Header, data: Vec<u8>, complete_tx: Sender<SendResult>) {
+        let serialized_header = header_serialize_factory(header_version, header).expect("Failed to serialize header");
+        let data = [serialized_header, data].concat();
+        self.send_channel
+            .send((address, data, complete_tx))
+            .expect("Unexpected! Failed to send data with headers to channel. Sender task must have been dropped.");
     }
 
     pub fn evict_socket(&self, address: SocketAddr) {
