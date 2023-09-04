@@ -7,6 +7,7 @@ use std::time::Instant;
 use std::{net::ToSocketAddrs, sync::Arc};
 
 use headers::header_v1::HeaderV1;
+use header_factory::header_from_json_string;
 use log::info;
 use log::LevelFilter;
 use lru::LruCache;

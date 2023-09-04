@@ -47,6 +47,13 @@ pub fn vec_to_hex_string(data: Vec<u8>) -> String {
         .join("")
 }
 
+pub fn header_from_json_string(json_str: &str, version: &str) -> Option<Header> {
+    match version {
+        "v1" => HeaderV1::from_json_string(json_str).map(Header::V1),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

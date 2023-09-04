@@ -1,6 +1,11 @@
 use std::io::{Cursor, Read, Write};
 use uuid::Uuid;
+extern crate serde;
+extern crate serde_json;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct HeaderV1 {
     pub sender_address: [u8; 32],
     pub uuid: Uuid,
@@ -81,6 +86,10 @@ impl HeaderV1 {
             return false;
         }
         true
+    }
+
+    pub fn from_json_string(json_str: &str) -> Option<Self> {
+        serde_json::from_str(json_str).ok()
     }
 }
 

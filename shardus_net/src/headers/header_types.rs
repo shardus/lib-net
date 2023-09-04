@@ -10,4 +10,8 @@ impl Header {
             Header::V1(header_v1) => header_v1.validate(message),
         }
     }
+
+    pub fn from_json_string() -> Option<Header> {
+        None
+    }
 }
