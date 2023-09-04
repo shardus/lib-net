@@ -1,5 +1,8 @@
+//The idea and interface of this class is good, but the code was mostly AI generated and I think it is not good enough
+//yet.   there are also some problems like using usize
 pub struct VecU8Stream {
-    data: Vec<u8>,
+    pub data: Vec<u8>,
+    //i think it is probably bad for this to be a usize that can vary in size depending on the platform
     pub cursor: usize,
 }
 
@@ -47,16 +50,26 @@ impl VecU8Stream {
 
     #[allow(dead_code)]
     pub fn write_buffer(&mut self, buf: &[u8]) {
-        self.write::<usize>(buf.len()); // write the length
+        //convert the length to a u32
+        //for what we need for networking this should always be fine
+        let u32len = buf.len() as u32;
+
+        self.write::<u32>(u32len); // write the length
+                                   //increment the cursor for usize that was just written
+                                   //self.cursor += std::mem::size_of::<usize>();
+
         self.data.extend_from_slice(buf); // write the buffer data
     }
 
     #[allow(dead_code)]
     pub fn read_buffer(&mut self) -> Option<Vec<u8>> {
-        let len = self.read::<usize>()?; // read the length
-        if self.cursor + len <= self.data.len() {
-            let bytes = &self.data[self.cursor..self.cursor + len].to_vec();
-            self.cursor += len;
+        //We are reading the length as a u32.
+        //for what we need for networking this should always be fine
+        let len = self.read::<u32>()?;
+        let usize_len = len as usize;
+        if self.cursor + usize_len <= self.data.len() {
+            let bytes = &self.data[self.cursor..self.cursor + usize_len].to_vec();
+            self.cursor += usize_len;
             Some(bytes.clone())
         } else {
             None
@@ -65,6 +78,7 @@ impl VecU8Stream {
 
     #[allow(dead_code)]
     pub fn write_array<T: std::marker::Copy, const N: usize>(&mut self, values: &[T; N]) {
+        //note: arrays are fixes size so we can just write the bytes
         for value in values.iter() {
             self.write(*value);
         }

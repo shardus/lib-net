@@ -92,4 +92,74 @@ mod tests {
         let value = stream.read::<f64>().unwrap();
         assert_eq!(value, 2.71828);
     }
+
+    //create a test that writes a struct to the stream and then reads it back
+    #[test]
+    fn test_write_and_read_struct() {
+        #[derive(Debug, PartialEq)]
+        struct MyStruct {
+            a: u8,
+            b: i16,
+            c: u32,
+            d: i64,
+            e: f32,
+            f: f64,
+        }
+
+        let mut stream = VecU8Stream::new(Vec::new());
+        let my_struct = MyStruct {
+            a: 1,
+            b: -2,
+            c: 3,
+            d: -4,
+            e: 5.0,
+            f: -6.0,
+        };
+        stream.write(my_struct.a);
+        stream.write(my_struct.b);
+        stream.write(my_struct.c);
+        stream.write(my_struct.d);
+        stream.write(my_struct.e);
+        stream.write(my_struct.f);
+        let value = MyStruct {
+            a: stream.read().unwrap(),
+            b: stream.read().unwrap(),
+            c: stream.read().unwrap(),
+            d: stream.read().unwrap(),
+            e: stream.read().unwrap(),
+            f: stream.read().unwrap(),
+        };
+        assert_eq!(value, my_struct);
+    }
+
+    //create a test that writes a struct to the stream and then reads it back.  a buffer should be the first field. should also have a string
+    #[test]
+    fn test_write_and_read_struct_with_buffer_and_string() {
+        #[derive(Debug, PartialEq)]
+        struct MyStruct {
+            a: Vec<u8>,
+            b: String,
+            c: u8,
+        }
+
+        let mut stream = VecU8Stream::new(Vec::new());
+        let my_struct = MyStruct {
+            a: vec![1, 2, 3],
+            b: "hello".to_string(),
+            c: 4,
+        };
+        stream.write_buffer(&my_struct.a);
+        stream.write_string(&my_struct.b);
+        stream.write(my_struct.c);
+        let value = MyStruct {
+            a: stream.read_buffer().unwrap(),
+            b: stream.read_string().unwrap(),
+            c: stream.read().unwrap(),
+        };
+        //value.c = 88;
+        assert_eq!(value, my_struct);
+
+        //print the hex contents of the stream
+        println!("{:x?}", stream.data);
+    }
 }
