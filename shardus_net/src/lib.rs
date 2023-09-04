@@ -8,12 +8,8 @@ use std::{net::ToSocketAddrs, sync::Arc};
 
 use headers::header_v1::HeaderV1;
 use header_factory::header_from_json_string;
-<<<<<<< HEAD
-use header_factory::header_from_json_string;
 use headers::header_v1::HeaderV1;
-=======
 use headers::header_types::Header;
->>>>>>> ac0e233 (fix: header json string parse and data string to byte)
 use log::info;
 use log::LevelFilter;
 use lru::LruCache;
