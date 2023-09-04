@@ -207,8 +207,6 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
     stats_incrementers.increment_outstanding_sends();
 
-    println!("header_js_string: {}", header_js_string);
-
     let header = match header_from_json_string(&header_js_string, &header_version) {
         Some(header) => header,
         None => {

@@ -71,9 +71,9 @@ mod tests {
             message_length: 100,
         };
 
-        let serialized = header.serialize(); // make sure your serialize function now works with the new HeaderV1
+        let serialized = header.serialize();
         let mut cursor = Cursor::new(serialized);
-        let deserialized = HeaderV1::deserialize(&mut cursor).unwrap(); // make sure your deserialize function now works with the new HeaderV1
+        let deserialized = HeaderV1::deserialize(&mut cursor).unwrap();
 
         assert_eq!(header.uuid, deserialized.uuid);
         assert_eq!(header.message_type, deserialized.message_type);

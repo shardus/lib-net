@@ -418,7 +418,7 @@ export const Sn = (opts: SnOpts) => {
     // that can check the first byte and determine if we use the old json protocol or a new protocol
     // with headers
     const server = await _net.listen((data, remoteIp, remotePort, headerVersion?, headerData?) => {
-      if (headerVersion !== undefined && headerData !== undefined) {
+      if (headerVersion !== null && headerData !== null) {
         console.log('header version', headerVersion)
         console.log('header data', headerData)
       }

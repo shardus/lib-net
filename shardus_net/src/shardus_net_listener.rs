@@ -115,7 +115,6 @@ impl ShardusNetListener {
                 let mut cursor = Cursor::new(msg_bytes.to_vec());
                 let header = header_deserialize_factory(header_version, &mut cursor).expect("Failed to deserialize header");
                 let header_length = cursor.position() as usize;
-                println!("header: {}", header.to_json_string().expect("Failed to serialize header"));
 
                 let remaining_msg_bytes = &msg_bytes[( header_length)..];
 
@@ -126,7 +125,6 @@ impl ShardusNetListener {
 
                 // deserialize remaining bytes as your message
                 let msg = String::from_utf8(remaining_msg_bytes.to_vec())?;
-                println!("msg: {}", msg);
                 received_msg_tx.send((msg, remote_addr, Some(wrapped_header))).map_err(|_| SendError(()))?;
             } else {
                 // No header present
