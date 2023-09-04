@@ -91,6 +91,10 @@ impl HeaderV1 {
     pub fn from_json_string(json_str: &str) -> Option<Self> {
         serde_json::from_str(json_str).ok()
     }
+
+    pub fn to_json_string(&self) -> Option<String> {
+        serde_json::to_string(self).ok()
+    }
 }
 
 #[cfg(test)]

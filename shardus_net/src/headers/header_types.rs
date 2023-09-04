@@ -11,7 +11,14 @@ impl Header {
         }
     }
 
-    pub fn from_json_string() -> Option<Header> {
-        None
+    pub fn to_json_string(&self) -> Option<String> {
+        match self {
+            Header::V1(header_v1) => header_v1.to_json_string(),
+        }
     }
+}
+
+pub struct WrappedHeader {
+    pub version: u8,
+    pub header_json_string: String,
 }

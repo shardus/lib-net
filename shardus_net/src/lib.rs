@@ -8,8 +8,8 @@ use std::{net::ToSocketAddrs, sync::Arc};
 
 use headers::header_v1::HeaderV1;
 use header_factory::header_from_json_string;
-use headers::header_v1::HeaderV1;
 use header_factory::header_from_json_string;
+use headers::header_v1::HeaderV1;
 use log::info;
 use log::LevelFilter;
 use lru::LruCache;
@@ -37,7 +37,6 @@ use uuid::Uuid;
 
 use crate::shardus_net_sender::Connection;
 
-
 pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
     let host: String = cx.argument::<JsString>(0)?.value(cx) as String;
@@ -47,10 +46,9 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let data: String = cx.argument::<JsString>(4)?.value(cx) as String;
     let timeout: i64 = cx.argument::<JsNumber>(5)?.value(cx) as i64;
     let complete_cb = cx.argument::<JsFunction>(6)?.root(cx);
-    
+
     let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
     let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
- 
 
     let this = cx.this().root(cx);
     let channel = cx.channel();
@@ -61,7 +59,7 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     //----------------------------
     //FIND A WAY TO DECOUPLE THIS PIECE OF CODE INTO A FUNCTION ONCE WE HONED RUST SKILLS
     //CONVERT JSOBJECT TO HEADERV1
-    let sender_address_js: Handle<JsArray> = header.get(cx, "sender_address")?.downcast_or_throw::<_,_>(cx)?;
+    let sender_address_js: Handle<JsArray> = header.get(cx, "sender_address")?.downcast_or_throw::<_, _>(cx)?;
     let mut sender_address = [0u8; 32];
     for i in 0..32 {
         sender_address[i] = sender_address_js.get(cx, i as u32)?.downcast::<JsNumber, _>(cx).or_throw(cx)?.value(cx) as u8;
@@ -76,16 +74,16 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         }
     };
     // Extract and convert message_type
-    let message_type: u32 = header.get(cx, "message_type")?.downcast::<JsNumber,_>(cx).or_throw(cx)?.value(cx) as u32;
+    let message_type: u32 = header.get(cx, "message_type")?.downcast::<JsNumber, _>(cx).or_throw(cx)?.value(cx) as u32;
 
     // Extract and convert message_length
-    let message_length: u32 = header.get(cx, "message_length")?.downcast_or_throw::<JsNumber,_>(cx)?.value(cx) as u32;
+    let message_length: u32 = header.get(cx, "message_length")?.downcast_or_throw::<JsNumber, _>(cx)?.value(cx) as u32;
 
     // Extract and convert authorization_data
     let auth_data_js: Handle<JsArray> = header.get(cx, "authorization_data")?.downcast_or_throw(cx)?;
     let mut authorization_data = Vec::new();
     for i in 0..auth_data_js.len(cx) {
-        let byte = auth_data_js.get(cx, i as u32)?.downcast_or_throw::<JsNumber,_>(cx)?.value(cx) as u8;
+        let byte = auth_data_js.get(cx, i as u32)?.downcast_or_throw::<JsNumber, _>(cx)?.value(cx) as u8;
         authorization_data.push(byte);
     }
 
@@ -100,23 +98,23 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
     RUNTIME.spawn(async move {
         let result = complete_rx.await.expect("Complete send tx dropped before notify");
-    
+
         RUNTIME.spawn_blocking(move || {
             channel.send(move |mut cx| {
                 let cx = &mut cx;
                 let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
                 (**stats).borrow_mut().decrement_outstanding_sends();
-    
+
                 let this = cx.undefined();
                 let mut args = Vec::new();
-    
+
                 if let Err(err) = result {
                     let error = cx.string(format!("{:?}", err));
                     args.push(error);
                 }
-    
+
                 complete_cb.to_inner(cx).call(cx, this, args)?;
-    
+
                 Ok(())
             });
         });
@@ -126,7 +124,7 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         Ok(mut address) => {
             let address = address.next().expect("Expected at least one address");
             shardus_net_sender.send_with_headers(address, header_version, headers::header_types::Header::V1(header), data, complete_tx);
-    
+
             Ok(cx.undefined())
         }
         Err(_) => cx.throw_type_error("The provided address is not valid"),
@@ -190,12 +188,21 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         // rx is the UnboundedReceiver<(String, SocketAddr)> that is returned from listen.
         // all received messages are sent to the UnboundedSender.  here we call recv to
         // get messages from the UnboundedReceiver.  recv is a blocking call
-        while let Some((msg, remote_address)) = rx.recv().await {
+        while let Some((msg, remote_address, optional_wrapped_header)) = rx.recv().await {
             let callback = callback.clone();
             let this = this.clone();
             let channel = channel.clone();
 
             stats_incrementers.increment_outstanding_receives();
+
+            match optional_wrapped_header {
+                Some(wrapped_header) => {
+                    println!("WrappedHeader is present with version: {}, json string: {}", wrapped_header.version, wrapped_header.header_json_string);
+                }
+                None => {
+                    println!("No WrappedHeader is present.");
+                }
+            }
 
             RUNTIME.spawn_blocking(move || {
                 let now = Instant::now();
@@ -412,9 +419,6 @@ fn to_stats_object<'a>(cx: &mut impl Context<'a>, long_term_max: f64, long_term_
 
     Ok(obj)
 }
-
-
-
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {

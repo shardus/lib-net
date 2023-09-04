@@ -1,4 +1,5 @@
 use crate::header_factory::header_deserialize_factory;
+use crate::headers::header_types::WrappedHeader;
 
 use super::runtime::RUNTIME;
 
@@ -38,17 +39,17 @@ impl ShardusNetListener {
         Ok(Self { address })
     }
 
-    pub fn listen(&self) -> UnboundedReceiver<(String, SocketAddr)> {
+    pub fn listen(&self) -> UnboundedReceiver<(String, SocketAddr, Option<WrappedHeader>)> {
         Self::spawn_listener(self.address)
     }
 
-    fn spawn_listener(address: SocketAddr) -> UnboundedReceiver<(String, SocketAddr)> {
+    fn spawn_listener(address: SocketAddr) -> UnboundedReceiver<(String, SocketAddr, Option<WrappedHeader>)> {
         let (tx, rx) = unbounded_channel();
         RUNTIME.spawn(Self::bind_to_socket(address, tx));
         rx
     }
 
-    async fn bind_to_socket(address: SocketAddr, tx: UnboundedSender<(String, SocketAddr)>) {
+    async fn bind_to_socket(address: SocketAddr, tx: UnboundedSender<(String, SocketAddr, Option<WrappedHeader>)>) {
         loop {
             let listener = TcpListener::bind(address).await;
 
@@ -69,7 +70,7 @@ impl ShardusNetListener {
         }
     }
 
-    async fn accept_connections(listener: TcpListener, received_msg_tx: UnboundedSender<(String, SocketAddr)>) -> std::io::Result<()> {
+    async fn accept_connections(listener: TcpListener, received_msg_tx: UnboundedSender<(String, SocketAddr, Option<WrappedHeader>)>) -> std::io::Result<()> {
         loop {
             let (socket, remote_addr) = listener.accept().await?;
             let received_msg_tx = received_msg_tx.clone();
@@ -86,7 +87,7 @@ impl ShardusNetListener {
         }
     }
 
-    async fn receive(socket_stream: TcpStream, remote_addr: SocketAddr, received_msg_tx: UnboundedSender<(String, SocketAddr)>) -> ListenerResult<()> {
+    async fn receive(socket_stream: TcpStream, remote_addr: SocketAddr, received_msg_tx: UnboundedSender<(String, SocketAddr, Option<WrappedHeader>)>) -> ListenerResult<()> {
         let mut socket_stream = socket_stream;
         while let Ok(msg_len) = socket_stream.read_u32().await {
             let msg_len = msg_len as usize;
@@ -121,13 +122,18 @@ impl ShardusNetListener {
                     continue;
                 }
 
+                let wrapped_header = WrappedHeader {
+                    version: header_version,
+                    header_json_string: header.to_json_string().expect("Failed to serialize header"),
+                };
+
                 // deserialize remaining bytes as your message
                 let msg = String::from_utf8(remaining_msg_bytes.to_vec())?;
-                received_msg_tx.send((msg, remote_addr)).map_err(|_| SendError(()))?;
+                received_msg_tx.send((msg, remote_addr, Some(wrapped_header))).map_err(|_| SendError(()))?;
             } else {
                 // No header present
                 let msg = String::from_utf8(buffer)?;
-                received_msg_tx.send((msg, remote_addr)).map_err(|_| SendError(()))?;
+                received_msg_tx.send((msg, remote_addr, None)).map_err(|_| SendError(()))?;
             }
         }
 
