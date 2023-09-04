@@ -9,6 +9,7 @@ pub fn wrap_serialized_header(version: u8, mut serialized_header: Vec<u8>) -> Ve
     buffer
 }
 
+#[allow(dead_code)]
 pub fn unwrap_serialized_header(mut serialized_header: Vec<u8>) -> Option<(u8, Vec<u8>)> {
     if serialized_header.len() < 2 {
         return None;
@@ -40,6 +41,7 @@ pub fn header_serialize_factory(header_version: u8, header: Header) -> Option<Ve
     }
 }
 
+#[allow(dead_code)]
 pub fn vec_to_hex_string(data: Vec<u8>) -> String {
     data.iter()
         .map(|byte| format!("{:02x}", byte))

@@ -8,8 +8,6 @@ use std::{net::ToSocketAddrs, sync::Arc};
 
 use headers::header_v1::HeaderV1;
 use header_factory::header_from_json_string;
-use headers::header_v1::HeaderV1;
-use headers::header_types::Header;
 use log::info;
 use log::LevelFilter;
 use lru::LruCache;
@@ -35,71 +33,6 @@ use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 
 use crate::shardus_net_sender::Connection;
-
-pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let cx = &mut cx;
-    let host: String = cx.argument::<JsString>(0)?.value(cx) as String;
-    let port: u16 = cx.argument::<JsNumber>(1)?.value(cx) as u16;
-    let header_version: u8 = cx.argument::<JsNumber>(2)?.value(cx) as u8;
-    let header_js_string: String = cx.argument::<JsString>(3)?.value(cx) as String;
-    let data_js_string: String = cx.argument::<JsString>(4)?.value(cx) as String;
-    let timeout: i64 = cx.argument::<JsNumber>(5)?.value(cx) as i64;
-    let complete_cb = cx.argument::<JsFunction>(6)?.root(cx);
-
-    let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
-    let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
-
-    let this = cx.this().root(cx);
-    let channel = cx.channel();
-    let (complete_tx, complete_rx) = oneshot::channel::<SendResult>();
-
-    stats_incrementers.increment_outstanding_sends();
-
-    let header = match header_from_json_string(&header_js_string, &header_version) {
-        Some(header) => header,
-        None => {
-            // Throw a JavaScript error if header is None
-            return cx.throw_error("Failed to parse header");
-        }
-    };
-
-    let data = data_js_string.into_bytes().to_vec();
-
-
-    RUNTIME.spawn(async move {
-        let result = complete_rx.await.expect("Complete send tx dropped before notify");
-
-        RUNTIME.spawn_blocking(move || {
-            channel.send(move |mut cx| {
-                let cx = &mut cx;
-                let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
-                (**stats).borrow_mut().decrement_outstanding_sends();
-
-                let this = cx.undefined();
-                let mut args = Vec::new();
-
-                if let Err(err) = result {
-                    let error = cx.string(format!("{:?}", err));
-                    args.push(error);
-                }
-
-                complete_cb.to_inner(cx).call(cx, this, args)?;
-
-                Ok(())
-            });
-        });
-    });
-
-    match (host, port as u16).to_socket_addrs() {
-        Ok(mut address) => {
-            let address = address.next().expect("Expected at least one address");
-            shardus_net_sender.send_with_headers(address, header_version, header, data, complete_tx);
-    
-            Ok(cx.undefined())
-        }
-        Err(_) => cx.throw_type_error("The provided address is not valid"),
-    }
-}
 
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
@@ -165,15 +98,6 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
             stats_incrementers.increment_outstanding_receives();
 
-            match optional_wrapped_header {
-                Some(wrapped_header) => {
-                    println!("WrappedHeader is present with version: {}, json string: {}", wrapped_header.version, wrapped_header.header_json_string);
-                }
-                None => {
-                    println!("No WrappedHeader is present.");
-                }
-            }
-
             RUNTIME.spawn_blocking(move || {
                 let now = Instant::now();
                 channel.send(move |mut cx| {
@@ -192,7 +116,17 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     let message = cx.string(msg);
                     let remote_ip = cx.string(remote_address.ip().to_string());
                     let remote_port = cx.number(remote_address.port());
-                    let args: [Handle<JsValue>; 3] = [message.upcast(), remote_ip.upcast(), remote_port.upcast()];
+                    let optional_js_version: neon::handle::Handle<'_, neon::prelude::JsValue> = match &optional_wrapped_header {
+                        Some(wrapped_header) => cx.number(wrapped_header.version as f64).upcast(),
+                        None => cx.null().upcast(),
+                    };
+
+                    let optional_js_json_string: neon::handle::Handle<'_, neon::prelude::JsValue> = match &optional_wrapped_header {
+                        Some(wrapped_header) => cx.string(&wrapped_header.header_json_string).upcast(),
+                        None => cx.null().upcast(),
+                    };
+
+                    let args: [Handle<JsValue>; 5] = [message.upcast(), remote_ip.upcast(), remote_port.upcast(), optional_js_version, optional_js_json_string];
 
                     callback.to_inner(cx).call(cx, this, args)?;
 
@@ -248,6 +182,69 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         Ok(mut address) => {
             let address = address.next().expect("Expected at least one address");
             shardus_net_sender.send(address, data, complete_tx);
+
+            Ok(cx.undefined())
+        }
+        Err(_) => cx.throw_type_error("The provided address is not valid"),
+    }
+}
+
+pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let cx = &mut cx;
+    let host: String = cx.argument::<JsString>(0)?.value(cx) as String;
+    let port: u16 = cx.argument::<JsNumber>(1)?.value(cx) as u16;
+    let header_version: u8 = cx.argument::<JsNumber>(2)?.value(cx) as u8;
+    let header_js_string: String = cx.argument::<JsString>(3)?.value(cx) as String;
+    let data_js_string: String = cx.argument::<JsString>(4)?.value(cx) as String;
+    let complete_cb = cx.argument::<JsFunction>(6)?.root(cx);
+
+    let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
+    let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
+
+    let this = cx.this().root(cx);
+    let channel = cx.channel();
+    let (complete_tx, complete_rx) = oneshot::channel::<SendResult>();
+
+    stats_incrementers.increment_outstanding_sends();
+
+    let header = match header_from_json_string(&header_js_string, &header_version) {
+        Some(header) => header,
+        None => {
+            // Throw a JavaScript error if header is None
+            return cx.throw_error("Failed to parse header");
+        }
+    };
+
+    let data = data_js_string.into_bytes().to_vec();
+
+    RUNTIME.spawn(async move {
+        let result = complete_rx.await.expect("Complete send tx dropped before notify");
+
+        RUNTIME.spawn_blocking(move || {
+            channel.send(move |mut cx| {
+                let cx = &mut cx;
+                let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+                (**stats).borrow_mut().decrement_outstanding_sends();
+
+                let this = cx.undefined();
+                let mut args = Vec::new();
+
+                if let Err(err) = result {
+                    let error = cx.string(format!("{:?}", err));
+                    args.push(error);
+                }
+
+                complete_cb.to_inner(cx).call(cx, this, args)?;
+
+                Ok(())
+            });
+        });
+    });
+
+    match (host, port as u16).to_socket_addrs() {
+        Ok(mut address) => {
+            let address = address.next().expect("Expected at least one address");
+            shardus_net_sender.send_with_headers(address, header_version, header, data, complete_tx);
 
             Ok(cx.undefined())
         }
