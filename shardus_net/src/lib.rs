@@ -8,8 +8,12 @@ use std::{net::ToSocketAddrs, sync::Arc};
 
 use headers::header_v1::HeaderV1;
 use header_factory::header_from_json_string;
+<<<<<<< HEAD
 use header_factory::header_from_json_string;
 use headers::header_v1::HeaderV1;
+=======
+use headers::header_types::Header;
+>>>>>>> ac0e233 (fix: header json string parse and data string to byte)
 use log::info;
 use log::LevelFilter;
 use lru::LruCache;
@@ -33,7 +37,6 @@ use simplelog::{Config, SimpleLogger};
 use stats::{Incrementers, Stats, StatsResult};
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 use crate::shardus_net_sender::Connection;
 
@@ -42,8 +45,8 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let host: String = cx.argument::<JsString>(0)?.value(cx) as String;
     let port: u16 = cx.argument::<JsNumber>(1)?.value(cx) as u16;
     let header_version: u8 = cx.argument::<JsNumber>(2)?.value(cx) as u8;
-    let mut header: Handle<JsObject> = cx.argument(3)?;
-    let data: String = cx.argument::<JsString>(4)?.value(cx) as String;
+    let header_js_string: String = cx.argument::<JsString>(3)?.value(cx) as String;
+    let data_js_string: String = cx.argument::<JsString>(4)?.value(cx) as String;
     let timeout: i64 = cx.argument::<JsNumber>(5)?.value(cx) as i64;
     let complete_cb = cx.argument::<JsFunction>(6)?.root(cx);
 
@@ -56,45 +59,16 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
     stats_incrementers.increment_outstanding_sends();
 
-    //----------------------------
-    //FIND A WAY TO DECOUPLE THIS PIECE OF CODE INTO A FUNCTION ONCE WE HONED RUST SKILLS
-    //CONVERT JSOBJECT TO HEADERV1
-    let sender_address_js: Handle<JsArray> = header.get(cx, "sender_address")?.downcast_or_throw::<_, _>(cx)?;
-    let mut sender_address = [0u8; 32];
-    for i in 0..32 {
-        sender_address[i] = sender_address_js.get(cx, i as u32)?.downcast::<JsNumber, _>(cx).or_throw(cx)?.value(cx) as u8;
-    }
-
-    // Extract and convert uuid
-    let uuid_str: String = header.get(cx, "uuid")?.downcast::<JsString, _>(cx).or_throw(cx)?.value(cx);
-    let uuid = match Uuid::parse_str(&uuid_str) {
-        Ok(u) => u,
-        Err(_) => {
-            return cx.throw_error(format!("Invalid UUID: {}", uuid_str));
+    let header = match header_from_json_string(&header_js_string, &header_version) {
+        Some(header) => header,
+        None => {
+            // Throw a JavaScript error if header is None
+            return cx.throw_error("Failed to parse header");
         }
     };
-    // Extract and convert message_type
-    let message_type: u32 = header.get(cx, "message_type")?.downcast::<JsNumber, _>(cx).or_throw(cx)?.value(cx) as u32;
 
-    // Extract and convert message_length
-    let message_length: u32 = header.get(cx, "message_length")?.downcast_or_throw::<JsNumber, _>(cx)?.value(cx) as u32;
+    let data = data_js_string.into_bytes().to_vec();
 
-    // Extract and convert authorization_data
-    let auth_data_js: Handle<JsArray> = header.get(cx, "authorization_data")?.downcast_or_throw(cx)?;
-    let mut authorization_data = Vec::new();
-    for i in 0..auth_data_js.len(cx) {
-        let byte = auth_data_js.get(cx, i as u32)?.downcast_or_throw::<JsNumber, _>(cx)?.value(cx) as u8;
-        authorization_data.push(byte);
-    }
-
-    let header = HeaderV1 {
-        sender_address,
-        uuid,
-        message_type,
-        message_length,
-        authorization_data,
-    };
-    //------------------------------
 
     RUNTIME.spawn(async move {
         let result = complete_rx.await.expect("Complete send tx dropped before notify");
@@ -123,8 +97,8 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     match (host, port as u16).to_socket_addrs() {
         Ok(mut address) => {
             let address = address.next().expect("Expected at least one address");
-            shardus_net_sender.send_with_headers(address, header_version, headers::header_types::Header::V1(header), data, complete_tx);
-
+            shardus_net_sender.send_with_headers(address, header_version, header, data, complete_tx);
+    
             Ok(cx.undefined())
         }
         Err(_) => cx.throw_type_error("The provided address is not valid"),
