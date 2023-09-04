@@ -9,6 +9,10 @@ const setupLruSender = (port: number, lruSize: number) => {
       useLruCache: true,
       lruSize: lruSize,
     },
+    headerOpts: {
+      sendHeaderVersion: 1,
+      sendWithHeaders: true,
+    },
   })
 }
 
@@ -44,7 +48,15 @@ const main = async () => {
     const inputs = data.toString().trim().split(' ')
     if (inputs.length === 3) {
       const message = inputs[2]
-      await sn.send(+inputs[1], '127.0.0.1', { message, fromPort: +port }, 1000)
+      await sn.sendWithHeaders(
+        +inputs[1],
+        '127.0.0.1',
+        { message, fromPort: +port },
+        {
+          message_type: 1,
+        },
+        1000
+      )
       console.log('Message sent')
     } else if (inputs.length === 2) {
       sn.evictSocket(+inputs[1], '127.0.0.1')

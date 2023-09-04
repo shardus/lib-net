@@ -5,12 +5,6 @@ pub enum Header {
 }
 
 impl Header {
-    pub fn validate(&self, message: Vec<u8>) -> bool {
-        match self {
-            Header::V1(header_v1) => header_v1.validate(message),
-        }
-    }
-
     pub fn to_json_string(&self) -> Option<String> {
         match self {
             Header::V1(header_v1) => header_v1.to_json_string(),

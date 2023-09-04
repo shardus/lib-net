@@ -191,12 +191,12 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
-    let host: String = cx.argument::<JsString>(0)?.value(cx) as String;
-    let port: u16 = cx.argument::<JsNumber>(1)?.value(cx) as u16;
+    let port: u16 = cx.argument::<JsNumber>(0)?.value(cx) as u16;
+    let host: String = cx.argument::<JsString>(1)?.value(cx) as String;
     let header_version: u8 = cx.argument::<JsNumber>(2)?.value(cx) as u8;
     let header_js_string: String = cx.argument::<JsString>(3)?.value(cx) as String;
     let data_js_string: String = cx.argument::<JsString>(4)?.value(cx) as String;
-    let complete_cb = cx.argument::<JsFunction>(6)?.root(cx);
+    let complete_cb = cx.argument::<JsFunction>(5)?.root(cx);
 
     let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
     let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
@@ -206,6 +206,8 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let (complete_tx, complete_rx) = oneshot::channel::<SendResult>();
 
     stats_incrementers.increment_outstanding_sends();
+
+    println!("header_js_string: {}", header_js_string);
 
     let header = match header_from_json_string(&header_js_string, &header_version) {
         Some(header) => header,

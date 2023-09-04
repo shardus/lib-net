@@ -7,14 +7,15 @@ const setupLruSender = () => {
   const port = 49152
   if (USE_LRU_CACHE) {
     return Sn({
-      port, senderOpts: {
+      port,
+      senderOpts: {
         useLruCache: true,
         lruSize: 5,
-      }
+      },
     })
   } else {
     return Sn({
-      port
+      port,
     })
   }
 }
@@ -24,15 +25,14 @@ const main = async () => {
   let counter = 0
   await sn.listen((data: unknown, remote, respond) => {
     console.log(`${data}`)
-    console.log(`Received: ${JSON.stringify(data)} from ${JSON.stringify(remote)}`);
+    console.log(`Received: ${JSON.stringify(data)} from ${JSON.stringify(remote)}`)
 
     setTimeout(() => {
-      respond("Response message");
-    }, RESPONSE_DELAY_MILLIS);
+      respond('Response message')
+    }, RESPONSE_DELAY_MILLIS)
 
-    if (counter++ % 1000 === 0)
-      console.log(sn.stats());
+    if (counter++ % 1000 === 0) console.log(sn.stats())
   })
 }
 
-main().catch((err) => console.log("ERROR: ", err))
+main().catch((err) => console.log('ERROR: ', err))

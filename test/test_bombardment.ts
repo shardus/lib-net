@@ -48,10 +48,13 @@ async function socketBombardment() {
     console.log(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS === -1 ? 'infinite' : NUMBER_OF_BOMBS}`)
     let socketClientsToUse = NUMBER_OF_SOCKET_CLIENTS
     if (RAMP_UP_STRATEGY === 'linear' && i % RAMP_UP_EVERY_X_BOMBS === 0) {
-      console.log(`Ramping up socket clients from ${socketClientsToUse} to ${baseSocketClients * Math.floor(i / RAMP_UP_EVERY_X_BOMBS)}`)
+      console.log(
+        `Ramping up socket clients from ${socketClientsToUse} to ${
+          baseSocketClients * Math.floor(i / RAMP_UP_EVERY_X_BOMBS)
+        }`
+      )
       socketClientsToUse = baseSocketClients * Math.floor(i / RAMP_UP_EVERY_X_BOMBS)
-      if (socketClientsToUse > NUMBER_OF_SOCKET_CLIENTS)
-        socketClientsToUse = NUMBER_OF_SOCKET_CLIENTS
+      if (socketClientsToUse > NUMBER_OF_SOCKET_CLIENTS) socketClientsToUse = NUMBER_OF_SOCKET_CLIENTS
     }
     for (let j = 0; j < socketClientsToUse; j++) {
       // console.log(`Sending message ${j + 1} of ${NUMBER_OF_SOCKET_CLIENTS}`)
@@ -74,26 +77,23 @@ async function socketBombardmentWithLimitedActiveSockets(numberOfActiveSockets: 
     const promises: (() => Promise<void>)[] = []
     console.log(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS === -1 ? 'infinite' : NUMBER_OF_BOMBS}`)
     let socketClientsToUse = NUMBER_OF_SOCKET_CLIENTS
-    if (i != 0)
-      socketClientsToUse = numberOfActiveSockets
+    if (i != 0) socketClientsToUse = numberOfActiveSockets
     for (let j = 0; j < socketClientsToUse; j++) {
       // eslint-disable-next-line security/detect-object-injection
-      promises.push(
-        () => {
-          console.log(`Sending message ${j + 1} of ${socketClientsToUse}`)
-          return socketClients[j]
-            .send(TARGET_SOCKET_PORT, TARGET_SOCKET_HOST, MESSAGE_JSON)
-            .catch((err: Error) => console.error(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS} failed. Error: ${err}`))
-        }
-      )
+      promises.push(() => {
+        console.log(`Sending message ${j + 1} of ${socketClientsToUse}`)
+        return socketClients[j]
+          .send(TARGET_SOCKET_PORT, TARGET_SOCKET_HOST, MESSAGE_JSON)
+          .catch((err: Error) =>
+            console.error(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS} failed. Error: ${err}`)
+          )
+      })
     }
-    await Promise.all(promises.map(p => p()))
+    await Promise.all(promises.map((p) => p()))
   }
 }
 
-async function socketBombardmentWithInRandomOrder() {
-
-}
+async function socketBombardmentWithInRandomOrder() {}
 
 // console.log('Starting socket bombardment: socketBombardment')
 // socketBombardment()

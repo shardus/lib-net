@@ -15,20 +15,20 @@ npm i gitlab:shardus/shardus-net
 ### Javascript
 
 ```js
-const port = 1234;
-const address = 'localhost';
+const port = 1234
+const address = 'localhost'
 
-const sn = require('shardus-net')({ port, address });
+const sn = require('shardus-net')({ port, address })
 ```
 
 ### Typescript
 
 ```ts
-import * as ShardusNet from 'shardus-net';
+import * as ShardusNet from 'shardus-net'
 
-const port = 1234;
-const address = 'localhost';
-const sn = ShardusNet.createNetwork({ port, address });
+const port = 1234
+const address = 'localhost'
+const sn = ShardusNet.createNetwork({ port, address })
 ```
 
 ### sn.send
@@ -94,7 +94,7 @@ const server = await sn.listen((data, remote, protocol, respond) => {
 // When you want to spin down your listener, simply call stopListening and pass in
 // the server object you were given when you started listening.
 
-await sn.stopListening(servers);
+await sn.stopListening(servers)
 ```
 
 ## Developing

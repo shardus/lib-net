@@ -5,38 +5,49 @@ const address = '127.0.0.1'
 
 const listen = {
   address,
-  port: 5002
+  port: 5002,
 }
 
 const target = {
   address,
-  port: 5001
+  port: 5001,
 }
 
-const RESPONSE_TIMEOUT_MILLIS = 10000;
+const RESPONSE_TIMEOUT_MILLIS = 10000
 
 const sn = Sn(listen)
 
 sn.listen((data) => {
-  console.log("Received Data:", data);
-});
+  console.log('Received Data:', data)
+})
 
 const main = async () => {
-  let data = JSON.stringify(receipt);
+  let data = JSON.stringify(receipt)
 
   const promises = []
   for (let i = 0; i < 100; i++) {
-    promises.push(sn.send(target.port, target.address, data, RESPONSE_TIMEOUT_MILLIS, (response) => {
-      console.log("Received response:", response);
-    }, () => {
-      console.log("Failed to receive response message in time.");
-    }).catch(console.error));
+    promises.push(
+      sn
+        .send(
+          target.port,
+          target.address,
+          data,
+          RESPONSE_TIMEOUT_MILLIS,
+          (response) => {
+            console.log('Received response:', response)
+          },
+          () => {
+            console.log('Failed to receive response message in time.')
+          }
+        )
+        .catch(console.error)
+    )
   }
   console.log(promises)
   await Promise.all(promises).catch(console.error)
-  console.log("Completed");
+  console.log('Completed')
 
-  console.log(sn.stats());
+  console.log(sn.stats())
 }
 
 main()

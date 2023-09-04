@@ -200,7 +200,11 @@ export const Sn = (opts: SnOpts) => {
     augData: AugmentedData,
     timeout: number,
     onResponse: ResponseCallback,
-    onTimeout: TimeoutCallback
+    onTimeout: TimeoutCallback,
+    optionalHeader?: {
+      version: number
+      headers: Headers
+    }
   ) => {
     let stringifiedData: string
     if (opts.customStringifier) {
@@ -212,13 +216,30 @@ export const Sn = (opts: SnOpts) => {
     logMessageInfo(augData, stringifiedData)
 
     return new Promise<void>((resolve, reject) => {
-      _net.send(port, address, stringifiedData, (error) => {
-        if (error) {
-          reject(error)
+      if (optionalHeader === undefined || optionalHeader.version === 0) {
+        _net.send(port, address, stringifiedData, (error) => {
+          if (error) {
+            reject(error)
+          } else {
+            resolve()
+          }
+        })
+      } else {
+        optionalHeader.headers['message_length'] = stringifiedData.length
+        let stringifiedHeader: string
+        if (opts.customStringifier) {
+          stringifiedHeader = JSON.stringify(optionalHeader.headers)
         } else {
-          resolve()
+          stringifiedHeader = JSON.stringify(optionalHeader.headers)
         }
-      })
+        _net.send_with_headers(port, address, optionalHeader.version, stringifiedHeader,stringifiedData,  (error) => {
+          if (error) {
+            reject(error)
+          } else {
+            resolve()
+          }
+        })
+      }
 
       // a timeout of 0 means no return message is expected.
       if (timeout !== 0) {
@@ -265,8 +286,8 @@ export const Sn = (opts: SnOpts) => {
     port: number,
     address: string,
     data: unknown,
+    headers: Headers,
     timeout = 0,
-    headers: Headers = {},
     onResponse: ResponseCallback = noop,
     onTimeout: TimeoutCallback = noop
   ) => {
@@ -277,20 +298,14 @@ export const Sn = (opts: SnOpts) => {
       msgDir = 'tell'
     }
 
-    const augData: AugmentedData = {
-      data, // the user's data
-      UUID, // the ID we'll use to determine whether requests were "responded to"
-      PORT, // the listening port,    so the library knows to whom to send "responses" to
-      ADDRESS, // the listening address, although the library will use the address it got from the network
+    const augData: AugmentedData = createAugData(data, UUID,PORT, ADDRESS, msgDir)
 
-      sendTime: Date.now(),
-      receivedTime: 0,
-      replyTime: 0,
-      replyReceivedTime: 0,
-      msgDir,
-    }
+    headers['uuid'] = UUID
 
-    return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
+    return _sendAug(port, address, augData, timeout, onResponse, onTimeout, {
+      version: HEADER_OPTS.sendHeaderVersion,
+      headers: headers,
+    })
   }
 
   // TODO_HEADERS I think we may need to send asks in the future with a node ID as well if we want to check
@@ -306,8 +321,7 @@ export const Sn = (opts: SnOpts) => {
     onResponse: ResponseCallback = noop,
     onTimeout: TimeoutCallback = noop
   ) => {
-    const UUID = uuid()
-
+    const UUID = uuid();
     //TODO_HEADERS sending a port and address seems wrong here!! the response should come back over the existing socket
     //seems like this was written as if we are udp
 
@@ -316,19 +330,7 @@ export const Sn = (opts: SnOpts) => {
       msgDir = 'tell'
     }
 
-    // Under the hood, sn needs to pass around some extra data for its own internal usage.
-    const augData: AugmentedData = {
-      data, // the user's data
-      UUID, // the ID we'll use to determine whether requests were "responded to"
-      PORT, // the listening port,    so the library knows to whom to send "responses" to
-      ADDRESS, // the listening address, although the library will use the address it got from the network
-
-      sendTime: Date.now(),
-      receivedTime: 0,
-      replyTime: 0,
-      replyReceivedTime: 0,
-      msgDir,
-    }
+    const augData: AugmentedData = createAugData(data, UUID,PORT, ADDRESS, msgDir)
 
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
@@ -415,7 +417,12 @@ export const Sn = (opts: SnOpts) => {
     // TODO_HEADERS: extractUUIDHandleData will will have to be swapped with something a step up
     // that can check the first byte and determine if we use the old json protocol or a new protocol
     // with headers
-    const server = await _net.listen((data, remoteIp, remotePort) => {
+    const server = await _net.listen((data, remoteIp, remotePort, headerVersion?, headerData?) => {
+      if (headerVersion !== undefined && headerData !== undefined) {
+        console.log('header version', headerVersion)
+        console.log('header data', headerData)
+      }
+        
       extractUUIDHandleData(data, {
         address: remoteIp,
         port: remotePort,
@@ -440,7 +447,24 @@ export const Sn = (opts: SnOpts) => {
 
   const stats = () => _net.stats()
 
-  const returnVal = { send, listen, stopListening, stats, evictSocket, updateHeaderOpts }
+  const returnVal = { send, sendWithHeaders, listen, stopListening, stats, evictSocket, updateHeaderOpts }
 
   return returnVal
 }
+
+function createAugData(data: unknown, UUID: string , PORT: number, ADDRESS: string, msgDir: 'ask' | 'tell' | 'resp'): AugmentedData {
+  // Under the hood, sn needs to pass around some extra data for its own internal usage.
+  return {
+    data,
+    UUID,
+    PORT,
+    ADDRESS,
+
+    sendTime: Date.now(),
+    receivedTime: 0,
+    replyTime: 0,
+    replyReceivedTime: 0,
+    msgDir,
+  }
+}
+

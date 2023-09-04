@@ -6,29 +6,29 @@ const port = 5001
 
 const sn = Sn({
   address,
-  port
+  port,
 })
 
-const RESPONSE_DELAY_MILLIS = 1000;
+const RESPONSE_DELAY_MILLIS = 1000
 
 const main = async () => {
   await sn.listen((data, remote, respond) => {
-    console.log(`Received: ${data.length} from ${JSON.stringify(remote)}`);
+    console.log(`Received: ${data.length} from ${JSON.stringify(remote)}`)
 
     setTimeout(() => {
       if (!data.startsWith('Response')) {
-        respond("Response message");
+        respond('Response message')
       }
-    }, RESPONSE_DELAY_MILLIS);
+    }, RESPONSE_DELAY_MILLIS)
 
-    console.log(sn.stats());
+    console.log(sn.stats())
   })
 }
 
-main().catch((err) => console.log("ERROR: ", err))
+main().catch((err) => console.log('ERROR: ', err))
 
 function wait() {
-  setTimeout(wait, 200);
-};
+  setTimeout(wait, 200)
+}
 
 wait()
