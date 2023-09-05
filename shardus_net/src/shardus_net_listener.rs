@@ -116,7 +116,12 @@ impl ShardusNetListener {
                 let header = header_deserialize_factory(header_version, &mut cursor).expect("Failed to deserialize header");
                 let header_length = cursor.position() as usize;
 
-                let remaining_msg_bytes = &msg_bytes[( header_length)..];
+                let remaining_msg_bytes = &msg_bytes[(header_length)..];
+
+                if header.validate(remaining_msg_bytes.to_vec()) == false {
+                    error!("Failed to validate header");
+                    continue;
+                }
 
                 let wrapped_header = WrappedHeader {
                     version: header_version,

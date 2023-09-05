@@ -76,14 +76,19 @@ export interface RemoteSender {
 
 export type ResponseCallback = (data?: unknown) => void
 
+export type ListenerResponder = (data?: unknown, headers?: AppHeaders) => void
+
 export type TimeoutCallback = () => void
 
 export type ListenCallback = (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void
 
-export interface Headers {
-  uuid?: string
+export interface AppHeaders {
+  message_type?: number
   sender_address?: string
-  sender_port?: number
-  message_type: number
-  [key: string]: any
+}
+
+export interface CombinedHeaders {
+  uuid: string
+  message_type?: number
+  sender_address?: string
 }

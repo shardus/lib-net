@@ -51,7 +51,8 @@ impl ShardusNetSender {
             .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
     }
 
-    pub fn send_with_headers(&self, address: SocketAddr, header_version: u8, header: Header, data: Vec<u8>, complete_tx: Sender<SendResult>) {
+    pub fn send_with_headers(&self, address: SocketAddr, header_version: u8, mut header: Header, data: Vec<u8>, complete_tx: Sender<SendResult>) {
+        header.set_message_length(data.len() as u32);
         let serialized_header = wrap_serialized_header(header_version, header_serialize_factory(header_version, header).expect("Failed to serialize header"));
         let data = [serialized_header, data].concat();
         self.send_channel

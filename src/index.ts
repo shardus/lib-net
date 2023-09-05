@@ -1,13 +1,15 @@
 import * as uuid from 'uuid/v1'
 import {
   AugmentedData,
-  Headers,
+  AppHeaders,
+  CombinedHeaders,
   RemoteSender,
   ResponseCallback,
   SnOpts,
   TimeoutCallback,
   NewAugData,
   validateSnOpts,
+  ListenerResponder,
 } from './types'
 import { base64BufferReviver, stringifyData } from './util/Encoding'
 import { NewNumberHistogram } from './util/Histogram'
@@ -74,7 +76,7 @@ export const Sn = (opts: SnOpts) => {
     onTimeout: TimeoutCallback,
     optionalHeader?: {
       version: number
-      headerData: Headers
+      headerData: CombinedHeaders
     }
   ) => {
     const stringifiedData = stringifyData(augData, opts.customStringifier)
@@ -150,7 +152,7 @@ export const Sn = (opts: SnOpts) => {
     port: number,
     address: string,
     data: unknown,
-    headers: Headers,
+    headers: AppHeaders,
     timeout = 0,
     onResponse: ResponseCallback = noop,
     onTimeout: TimeoutCallback = noop
@@ -164,11 +166,15 @@ export const Sn = (opts: SnOpts) => {
 
     const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, msgDir)
 
-    headers.uuid = UUID
+    const combinedHeaders: CombinedHeaders = {
+      uuid: UUID,
+      message_type: headers.message_type,
+      sender_address: headers.sender_address,
+    }
 
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout, {
       version: HEADER_OPTS.sendHeaderVersion,
-      headerData: headers,
+      headerData: combinedHeaders,
     })
   }
 
@@ -227,7 +233,7 @@ export const Sn = (opts: SnOpts) => {
       const receivedTime = Date.now()
       // This is the return send function. A user will call this if they want
       // to "reply" or "respond" to an incoming message.
-      const respond: ResponseCallback = (data: unknown) => {
+      const respond: ResponseCallback = (data: unknown, ) => {
         //we can do some timestamp work here for better logging.
         const replyTime = Date.now()
         const sendData = {

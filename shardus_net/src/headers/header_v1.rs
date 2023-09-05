@@ -11,6 +11,7 @@ pub struct HeaderV1 {
     pub message_type: u32,
     #[serde(default)]
     pub message_length: u32,
+    #[serde(default)]
     pub sender_address: String,
 }
 
@@ -80,6 +81,13 @@ impl HeaderV1 {
             r#"{{"uuid": "{}", "message_type": {}, "message_length": {}, "sender_address": "{}"}}"#,
             self.uuid, self.message_type, self.message_length, self.sender_address
         ))
+    }
+
+    pub fn validate(&self, message: Vec<u8>) -> bool {
+        if message.len() != self.message_length as usize {
+            return false;
+        }
+        true
     }
 }
 
