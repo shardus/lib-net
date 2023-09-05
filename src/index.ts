@@ -239,6 +239,13 @@ export const Sn = (opts: SnOpts) => {
 
         //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)
         // @TODO: This error should be properly propagated and logged.
+        const { header, header_version } = data;
+        if(header && header_version){
+          return _sendAug(PORT, address, sendData, 0, noop, noop, {
+            version: data.header_version,
+            headers: data.header,
+          }).catch(console.error)
+        }
         return _sendAug(PORT, address, sendData, 0, noop, noop).catch(console.error)
       }
 
