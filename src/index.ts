@@ -1,155 +1,26 @@
 import * as uuid from 'uuid/v1'
-import validate from './opts'
+import {
+  AugmentedData,
+  Headers,
+  RemoteSender,
+  ResponseCallback,
+  SnOpts,
+  TimeoutCallback,
+  NewAugData,
+  validateSnOpts,
+} from './types'
+import { base64BufferReviver, stringifyData } from './util/Encoding'
 import { NewNumberHistogram } from './util/Histogram'
+import { logMessageInfo } from './util/Log'
 import { TTLMap } from './util/TTLMap'
-import { Headers } from './headers'
 const net = require('../../shardus-net.node')
 
 const DEFAULT_ADDRESS = '0.0.0.0'
 
-export type Address = string
-
-export type Port = number
-
-export interface RemoteSender {
-  address: string | undefined
-  port: number | undefined
-}
-
-export interface AugmentedData {
-  data: unknown
-  UUID: string
-  PORT: Port
-  ADDRESS?: Address
-
-  //here are some timestamps we can add to learn more about the time it takes for a TX
-  //to move through the system
-
-  /** timestamp of when we receive the TX */
-  sendTime: number
-  /** timestamp of then we got the message */
-  receivedTime: number
-  /** if this is a response we can log when did we send the response */
-  replyTime: number
-  /** the time when we receive a response */
-  replyReceivedTime: number
-
-  /**
-   *  this will show if the message is a ask, tell, or resp
-   *  in shardus net we call send() in two locations.  the ask will use a callback and timeout handler
-   *  that it will resolve
-   *  The one way send will not set these handlers.
-   *  if we are listening and need to reply to a message then we use _sendAug (with no callback)
-   *  do we need to put the message type in aug data? that could help in cases where the uuid is gone.
-   */
-  msgDir: 'ask' | 'tell' | 'resp'
-}
-
-/**
- * long info and timers for our message
- * @param augData
- * @param stringifiedData
- * @param sending
- * @param receivedTime
- */
-function logMessageInfo(
-  augData: AugmentedData,
-  stringifiedData: string,
-  sending: boolean = true,
-  receivedTime: number = 0
-) {
-  //first 50 chars of the message
-  let logData = stringifiedData.slice(0, 50)
-  let sendingStr = sending ? 'sending' : 'receiving'
-  let logMsg = `netmsglog: ${sendingStr} ${augData.msgDir}: ${logData} UUID: ${augData.UUID} PORT: ${augData.PORT} ADDRESS: ${augData.ADDRESS}`
-
-  if (augData.msgDir === 'tell') {
-    if (augData.sendTime != null) {
-      //log timestamps for sendTime
-      logMsg += ` sendTime:${augData.sendTime}`
-      if (sending === false) {
-        logMsg += ` recvTime:${receivedTime} recvDelta:${receivedTime - augData.sendTime}`
-      }
-    }
-  } else if (augData.msgDir === 'ask') {
-    if (augData.sendTime != null) {
-      logMsg += ` sendTime:${augData.sendTime}`
-      if (sending === false) {
-        logMsg += ` recvTime:${receivedTime} recvDelta:${receivedTime - augData.sendTime}`
-      }
-    }
-  } else if (augData.msgDir === 'resp') {
-    if (augData.sendTime != null) {
-      //reply delta is interesting as it is the time needed for the software to get the reply ready
-      logMsg += ` sendTime:${augData.sendTime} replyTime:${augData.replyTime} replyDelta:${
-        augData.replyTime - augData.receivedTime
-      } `
-      if (sending === false) {
-        // note the ask is how long it took for the original ask to get a reply, not the same as recvDelta, same code but but run at a different time/state
-        logMsg += ` recvTime:${receivedTime} askDelta:${receivedTime - augData.sendTime}`
-        logMsg += ` replyRecvTime:${augData.replyReceivedTime} replyRecvDelta:${
-          receivedTime - augData.replyReceivedTime
-        }`
-      }
-    }
-  }
-
-  console.log(logMsg)
-}
-
-export interface RemoteSender {
-  port: number | undefined
-  address: string | undefined
-}
-
-export type ResponseCallback = (data?: unknown) => void
-
-export type TimeoutCallback = () => void
-
-export const isObject = (val) => {
-  if (val === null) {
-    return false
-  }
-  if (Array.isArray(val)) {
-    return false
-  }
-  return typeof val === 'function' || typeof val === 'object'
-}
-
-function base64BufferReviver(key: string, value: any) {
-  const originalObject = value
-  if (
-    isObject(originalObject) &&
-    originalObject.hasOwnProperty('dataType') &&
-    originalObject.dataType &&
-    originalObject.dataType == 'bh'
-  ) {
-    return Buffer.from(originalObject.data, 'base64')
-  } else {
-    return value
-  }
-}
-
-export type ListenCallback = (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void
-
 const noop = () => {}
 
-export type SnOpts = {
-  port: number
-  address?: string
-  senderOpts?: {
-    useLruCache?: boolean
-    lruSize: number
-  }
-  headerOpts?: {
-    sendWithHeaders: boolean
-    sendHeaderVersion: number
-  }
-  customStringifier?: (val: any) => string
-}
-
 export const Sn = (opts: SnOpts) => {
-  validate(opts)
+  validateSnOpts(opts)
 
   const PORT = opts.port
   const ADDRESS = opts.address || DEFAULT_ADDRESS
@@ -203,42 +74,35 @@ export const Sn = (opts: SnOpts) => {
     onTimeout: TimeoutCallback,
     optionalHeader?: {
       version: number
-      headers: Headers
+      headerData: Headers
     }
   ) => {
-    let stringifiedData: string
-    if (opts.customStringifier) {
-      stringifiedData = opts.customStringifier(augData)
-    } else {
-      stringifiedData = JSON.stringify(augData)
-    }
+    const stringifiedData = stringifyData(augData, opts.customStringifier)
+    const stringifiedHeader = optionalHeader
+      ? stringifyData(optionalHeader.headerData, opts.customStringifier)
+      : null
 
     logMessageInfo(augData, stringifiedData)
 
     return new Promise<void>((resolve, reject) => {
-      if (optionalHeader === undefined || optionalHeader.version === 0) {
-        _net.send(port, address, stringifiedData, (error) => {
-          if (error) {
-            reject(error)
-          } else {
-            resolve()
-          }
-        })
-      } else {
-        optionalHeader.headers['message_length'] = stringifiedData.length
-        let stringifiedHeader: string
-        if (opts.customStringifier) {
-          stringifiedHeader = JSON.stringify(optionalHeader.headers)
+      const sendCallback = (error) => {
+        if (error) {
+          reject(error)
         } else {
-          stringifiedHeader = JSON.stringify(optionalHeader.headers)
+          resolve()
         }
-        _net.send_with_headers(port, address, optionalHeader.version, stringifiedHeader,stringifiedData,  (error) => {
-          if (error) {
-            reject(error)
-          } else {
-            resolve()
-          }
-        })
+      }
+      if (optionalHeader && stringifiedHeader !== null) {
+        _net.send_with_headers(
+          port,
+          address,
+          optionalHeader.version,
+          stringifiedHeader,
+          stringifiedData,
+          sendCallback
+        )
+      } else {
+        _net.send(port, address, stringifiedData, sendCallback)
       }
 
       // a timeout of 0 means no return message is expected.
@@ -298,13 +162,13 @@ export const Sn = (opts: SnOpts) => {
       msgDir = 'tell'
     }
 
-    const augData: AugmentedData = createAugData(data, UUID,PORT, ADDRESS, msgDir)
+    const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, msgDir)
 
-    headers['uuid'] = UUID
+    headers.uuid = UUID
 
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout, {
       version: HEADER_OPTS.sendHeaderVersion,
-      headers: headers,
+      headerData: headers,
     })
   }
 
@@ -321,7 +185,7 @@ export const Sn = (opts: SnOpts) => {
     onResponse: ResponseCallback = noop,
     onTimeout: TimeoutCallback = noop
   ) => {
-    const UUID = uuid();
+    const UUID = uuid()
     //TODO_HEADERS sending a port and address seems wrong here!! the response should come back over the existing socket
     //seems like this was written as if we are udp
 
@@ -330,7 +194,7 @@ export const Sn = (opts: SnOpts) => {
       msgDir = 'tell'
     }
 
-    const augData: AugmentedData = createAugData(data, UUID,PORT, ADDRESS, msgDir)
+    const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, msgDir)
 
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
@@ -422,7 +286,7 @@ export const Sn = (opts: SnOpts) => {
         console.log('header version', headerVersion)
         console.log('header data', headerData)
       }
-        
+
       extractUUIDHandleData(data, {
         address: remoteIp,
         port: remotePort,
@@ -451,20 +315,3 @@ export const Sn = (opts: SnOpts) => {
 
   return returnVal
 }
-
-function createAugData(data: unknown, UUID: string , PORT: number, ADDRESS: string, msgDir: 'ask' | 'tell' | 'resp'): AugmentedData {
-  // Under the hood, sn needs to pass around some extra data for its own internal usage.
-  return {
-    data,
-    UUID,
-    PORT,
-    ADDRESS,
-
-    sendTime: Date.now(),
-    receivedTime: 0,
-    replyTime: 0,
-    replyReceivedTime: 0,
-    msgDir,
-  }
-}
-

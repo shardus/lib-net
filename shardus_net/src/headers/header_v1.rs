@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 pub struct HeaderV1 {
     pub uuid: Uuid,
     pub message_type: u32,
+    #[serde(default)]
     pub message_length: u32,
 }
 

@@ -55,7 +55,7 @@ export const NewNumberHistogram = (name: string, bucketRanges: number[]) => {
   setInterval(() => {
     histogram.printHistogram(name)
     histogram.clearHistogram()
-  }, 2 * 60 * 1000)
+  }, 10 * 60 * 1000)
 
   return histogram
 }
