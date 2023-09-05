@@ -181,6 +181,7 @@ export const Sn = (opts: SnOpts) => {
     port: number,
     address: string,
     data: unknown,
+    headers = null,
     timeout = 0,
     onResponse: ResponseCallback = noop,
     onTimeout: TimeoutCallback = noop
@@ -195,7 +196,13 @@ export const Sn = (opts: SnOpts) => {
     }
 
     const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, msgDir)
-
+    
+    if(HEADER_OPTS.sendWithHeaders && headers !== null){
+      return _sendAug(port, address, augData, timeout, onResponse, onTimeout, {
+        version: HEADER_OPTS.sendHeaderVersion,
+        headerData: headers,
+      })
+    }
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
 
