@@ -92,7 +92,7 @@ export const Sn = (opts: SnOpts) => {
           resolve()
         }
       }
-      if (optionalHeader && stringifiedHeader !== null) {
+      if (HEADER_OPTS.sendWithHeaders && optionalHeader && stringifiedHeader !== null) {
         _net.send_with_headers(
           port,
           address,
