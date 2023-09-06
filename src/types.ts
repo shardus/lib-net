@@ -52,7 +52,7 @@ export type SnOpts = {
     sendWithHeaders: boolean
     sendHeaderVersion: number
   }
-  customStringifier?: (val: any) => string
+  customStringifier?: (val) => string
 }
 
 /**

@@ -12,7 +12,7 @@
     "plugin:security/recommended",
     "prettier"
   ],
-  "ignorePatterns": ["opts.ts", "index.ts"],
+  "ignorePatterns": ["index.ts", "types.ts", "src/util/*.ts"],
   "rules": {
     "no-empty": [
       1,

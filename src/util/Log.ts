@@ -1,4 +1,4 @@
-import { AugmentedData } from "../types"
+import { AugmentedData } from '../types'
 
 /**
  * long info and timers for our message

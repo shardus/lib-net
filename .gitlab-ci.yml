@@ -2,7 +2,6 @@ image: 'registry.gitlab.com/shardus/dev-container'
 
 before_script:
   - node -v
-  - npm ci
 
 stages:
   - build
