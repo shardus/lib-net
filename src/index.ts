@@ -1,15 +1,15 @@
 import * as uuid from 'uuid/v1'
 import {
-  AugmentedData,
   AppHeaders,
+  AugmentedData,
   CombinedHeaders,
+  ListenerResponder,
+  NewAugData,
   RemoteSender,
   ResponseCallback,
   SnOpts,
   TimeoutCallback,
-  NewAugData,
   validateSnOpts,
-  ListenerResponder,
 } from './types'
 import { base64BufferReviver, stringifyData } from './util/Encoding'
 import { NewNumberHistogram } from './util/Histogram'
@@ -95,6 +95,7 @@ export const Sn = (opts: SnOpts) => {
         }
       }
       if (HEADER_OPTS.sendWithHeaders && optionalHeader && stringifiedHeader !== null) {
+        console.log('sending with headers')
         _net.send_with_headers(
           port,
           address,
@@ -104,6 +105,7 @@ export const Sn = (opts: SnOpts) => {
           sendCallback
         )
       } else {
+        console.log('sending without headers')
         _net.send(port, address, stringifiedData, sendCallback)
       }
 
@@ -187,7 +189,6 @@ export const Sn = (opts: SnOpts) => {
     port: number,
     address: string,
     data: unknown,
-    headers = null,
     timeout = 0,
     onResponse: ResponseCallback = noop,
     onTimeout: TimeoutCallback = noop
@@ -202,18 +203,12 @@ export const Sn = (opts: SnOpts) => {
     }
 
     const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, msgDir)
-    
-    if(HEADER_OPTS.sendWithHeaders && headers !== null){
-      return _sendAug(port, address, augData, timeout, onResponse, onTimeout, {
-        version: HEADER_OPTS.sendHeaderVersion,
-        headerData: headers,
-      })
-    }
+
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
 
   const listen = async (
-    handleData: (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void
+    handleData: (data: unknown, remote: RemoteSender, respond: ListenerResponder) => void
   ) => {
     // This is a wrapped form of the 'handleData' callback the user supplied.
     // Its job is to determine if the incoming data is a response to a request
@@ -233,7 +228,7 @@ export const Sn = (opts: SnOpts) => {
       const receivedTime = Date.now()
       // This is the return send function. A user will call this if they want
       // to "reply" or "respond" to an incoming message.
-      const respond: ResponseCallback = (data: unknown, ) => {
+      const respond: ListenerResponder = (data?: unknown, headers?: AppHeaders) => {
         //we can do some timestamp work here for better logging.
         const replyTime = Date.now()
         const sendData = {
@@ -248,18 +243,20 @@ export const Sn = (opts: SnOpts) => {
           msgDir: 'resp',
         }
 
-        //this is a "response"
+        const combinedHeaders: CombinedHeaders = {
+          uuid: UUID,
+        }
+        if (headers) {
+          combinedHeaders.message_type = headers.message_type
+          combinedHeaders.sender_address = headers.sender_address
+        }
 
         //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)
         // @TODO: This error should be properly propagated and logged.
-        const { header, header_version } = data;
-        if(header && header_version){
-          return _sendAug(PORT, address, sendData, 0, noop, noop, {
-            version: data.header_version,
-            headers: data.header,
-          }).catch(console.error)
-        }
-        return _sendAug(PORT, address, sendData, 0, noop, noop).catch(console.error)
+        return _sendAug(PORT, address, sendData, 0, noop, noop, {
+          version: HEADER_OPTS.sendHeaderVersion,
+          headerData: combinedHeaders,
+        }).catch(console.error)
       }
 
       // If we are expecting a response, go through the respond mechanism.
