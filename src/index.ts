@@ -208,12 +208,17 @@ export const Sn = (opts: SnOpts) => {
   }
 
   const listen = async (
-    handleData: (data: unknown, remote: RemoteSender, respond: ListenerResponder) => void
+    handleData: (
+      data: unknown,
+      remote: RemoteSender,
+      respond: ListenerResponder,
+      headers?: AppHeaders
+    ) => void
   ) => {
     // This is a wrapped form of the 'handleData' callback the user supplied.
     // Its job is to determine if the incoming data is a response to a request
     // the user sent. It does this by referencing the UUID map object.
-    const extractUUIDHandleData = (augDataStr: string, remote: RemoteSender) => {
+    const extractUUIDHandleData = (augDataStr: string, remote: RemoteSender, headers?: AppHeaders) => {
       // [TODO] Secure this with validation
       let augData: AugmentedData = JSON.parse(augDataStr, base64BufferReviver)
 
@@ -284,24 +289,25 @@ export const Sn = (opts: SnOpts) => {
       // Clear the respond mechanism.
       delete responseUUIDMapping[UUID]
 
-      return handle(data, remote, respond)
+      return handle(data, remote, respond, headers)
     }
 
     // OLD comment from initial implementation:
     // TODO these should be spun up in parallel, but that convolutes code
     // and doesn't save hardly any startup time, so skipping for now.
     // const server = await _net.listen(PORT, ADDRESS, extractUUIDHandleData)
-
-    //args to the callback function in listen
-    //let args: [Handle<JsValue>; 3] = [message.upcast(), remote_ip.upcast(), remote_port.upcast()];
-
-    // TODO_HEADERS: extractUUIDHandleData will will have to be swapped with something a step up
-    // that can check the first byte and determine if we use the old json protocol or a new protocol
-    // with headers
     const server = await _net.listen((data, remoteIp, remotePort, headerVersion?, headerData?) => {
       if (headerVersion !== null && headerData !== null) {
-        console.log('header version', headerVersion)
-        console.log('header data', headerData)
+        console.log(`received with headers version: ${headerVersion}`)
+        const headers: AppHeaders = JSON.parse(headerData)
+        extractUUIDHandleData(
+          data,
+          {
+            address: remoteIp,
+            port: remotePort,
+          },
+          headers
+        )
       }
 
       extractUUIDHandleData(data, {

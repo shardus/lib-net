@@ -36,8 +36,8 @@ const main = async () => {
   program.option('-c, --cache <size>', 'Size of the LRU cache', '2')
   program.parse(process.argv)
 
-  const port = program.getOptionValue('port').toString()
-  const cacheSize = program.getOptionValue('cache').toString()
+  const port = program.port.toString()
+  const cacheSize = program.cache.toString()
 
   console.log(`Starting listener on port ${port} with cache size ${cacheSize}`)
 
@@ -67,7 +67,7 @@ const main = async () => {
     }
   })
 
-  sn.listen(async (data: any, remote, respond) => {
+  sn.listen(async (data: any, remote, respond, headers) => {
     if (data && data.message === 'ping') {
       console.log('Received ping from:', data.fromPort)
       // await sleep(10000)
@@ -75,6 +75,9 @@ const main = async () => {
     }
     if (data && data.message === 'pong') {
       console.log('Received pong from:', data.fromPort)
+    }
+    if (headers) {
+      console.log('Received headers:', JSON.stringify(headers, null, 2))
     }
   })
 }
