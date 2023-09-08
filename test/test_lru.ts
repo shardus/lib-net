@@ -11,7 +11,7 @@ const setupLruSender = (port: number, lruSize: number) => {
     },
     headerOpts: {
       sendHeaderVersion: 1,
-      sendWithHeaders: true,
+      sendWithHeaders: false,
     },
   })
 }
@@ -54,6 +54,7 @@ const main = async () => {
         { message, fromPort: +port },
         {
           message_type: 1,
+          sender_address: 'test',
         },
         1000
       )
