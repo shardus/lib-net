@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { Sn } from '../.'
 import { Command } from 'commander'
 
@@ -11,7 +12,8 @@ const setupLruSender = (port: number, lruSize: number) => {
     },
     headerOpts: {
       sendHeaderVersion: 1,
-      sendWithHeaders: false,
+      sendWithHeaders: true,
+      enableDataCompression: true,
     },
   })
 }
@@ -81,10 +83,6 @@ const main = async () => {
       console.log('Received headers:', JSON.stringify(headers, null, 2))
     }
   })
-}
-
-const sleep = (ms: number) => {
-  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 main().catch((err) => console.log('ERROR: ', err))

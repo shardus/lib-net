@@ -8,7 +8,6 @@ exclude = ["index.node"]
 [lib]
 crate-type = ["cdylib"]
 
-
 [dependencies]
 parse_core = { path = "../parse_core" }
 bespoke_binary = { path = "../bespoke_binary" }
@@ -32,3 +31,5 @@ lru = "0.10.0"
 uuid = { version = "0.8", features = ["v4", "serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+flate2 = "1.0"
+brotli = "3.3"

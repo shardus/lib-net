@@ -51,6 +51,7 @@ export type SnOpts = {
   headerOpts?: {
     sendWithHeaders: boolean
     sendHeaderVersion: number
+    enableDataCompression: boolean
   }
   customStringifier?: (val) => string
 }
@@ -91,4 +92,7 @@ export interface CombinedHeaders {
   uuid: string
   message_type?: number
   sender_address?: string
+  compression?: string
 }
+
+export type CompressionTechnique = 'Gzip' | 'Brotli'

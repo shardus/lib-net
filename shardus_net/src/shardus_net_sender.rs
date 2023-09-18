@@ -52,9 +52,10 @@ impl ShardusNetSender {
     }
 
     pub fn send_with_headers(&self, address: SocketAddr, header_version: u8, mut header: Header, data: Vec<u8>, complete_tx: Sender<SendResult>) {
-        header.set_message_length(data.len() as u32);
+        let compressed_data = header.compress(data);
+        header.set_message_length(compressed_data.len() as u32);
         let serialized_header = wrap_serialized_header(header_version, header_serialize_factory(header_version, header).expect("Failed to serialize header"));
-        let data = [serialized_header, data].concat();
+        let data = [serialized_header, compressed_data].concat();
         self.send_channel
             .send((address, data, complete_tx))
             .expect("Unexpected! Failed to send data with headers to channel. Sender task must have been dropped.");

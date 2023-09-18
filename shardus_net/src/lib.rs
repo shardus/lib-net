@@ -6,7 +6,6 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{net::ToSocketAddrs, sync::Arc};
 
-use headers::header_v1::HeaderV1;
 use header_factory::header_from_json_string;
 use log::info;
 use log::LevelFilter;
@@ -21,6 +20,7 @@ mod stats;
 
 mod header_factory;
 pub mod headers;
+pub mod compression;
 
 use ring_buffer::Stats as RingBufferStats;
 use runtime::RUNTIME;

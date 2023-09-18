@@ -128,8 +128,10 @@ impl ShardusNetListener {
                     header_json_string: header.to_json_string().expect("Failed to serialize header"),
                 };
 
+                let decompressed_msg_bytes = header.decompress(remaining_msg_bytes).expect("Failed to decompress message");
+
                 // deserialize remaining bytes as your message
-                let msg = String::from_utf8(remaining_msg_bytes.to_vec())?;
+                let msg = String::from_utf8(decompressed_msg_bytes.to_vec())?;
                 received_msg_tx.send((msg, remote_addr, Some(wrapped_header))).map_err(|_| SendError(()))?;
             } else {
                 // No header present

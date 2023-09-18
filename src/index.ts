@@ -3,6 +3,7 @@ import {
   AppHeaders,
   AugmentedData,
   CombinedHeaders,
+  CompressionTechnique,
   ListenerResponder,
   NewAugData,
   RemoteSender,
@@ -19,6 +20,8 @@ const net = require('../../shardus-net.node')
 
 const DEFAULT_ADDRESS = '0.0.0.0'
 
+const COMPRESSION_TECHNIQUE: CompressionTechnique = 'Gzip'
+
 const noop = () => {}
 
 export const Sn = (opts: SnOpts) => {
@@ -32,6 +35,7 @@ export const Sn = (opts: SnOpts) => {
   const HEADER_OPTS = opts.headerOpts || {
     sendWithHeaders: false,
     sendHeaderVersion: 0,
+    enableDataCompression: true,
   }
 
   const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE)
@@ -174,6 +178,10 @@ export const Sn = (opts: SnOpts) => {
       sender_address: headers.sender_address,
     }
 
+    if (HEADER_OPTS.sendHeaderVersion) {
+      combinedHeaders.compression = COMPRESSION_TECHNIQUE
+    }
+
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout, {
       version: HEADER_OPTS.sendHeaderVersion,
       headerData: combinedHeaders,
@@ -254,6 +262,9 @@ export const Sn = (opts: SnOpts) => {
         if (headers) {
           combinedHeaders.message_type = headers.message_type
           combinedHeaders.sender_address = headers.sender_address
+        }
+        if (HEADER_OPTS.enableDataCompression) {
+          combinedHeaders.compression = COMPRESSION_TECHNIQUE
         }
 
         //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)

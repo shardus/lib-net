@@ -3,6 +3,7 @@ use uuid::Uuid;
 extern crate serde;
 extern crate serde_json;
 
+use crate::compression::compression::Compression;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -14,6 +15,8 @@ pub struct HeaderV1 {
     pub message_length: u32,
     #[serde(default)]
     pub sender_address: String,
+    #[serde(default = "Compression::default")]
+    pub compression: Compression,
 }
 
 impl HeaderV1 {
@@ -35,6 +38,9 @@ impl HeaderV1 {
         let sender_address_len = sender_address_bytes.len() as u32;
         buffer.write_all(&sender_address_len.to_le_bytes()).unwrap();
         buffer.write_all(sender_address_bytes).unwrap();
+
+        // Serialize compression (4 bytes)
+        buffer.write_all(&self.compression.to_u32().to_le_bytes()).unwrap();
 
         buffer
     }
@@ -65,11 +71,17 @@ impl HeaderV1 {
         cursor.read_exact(&mut sender_address_bytes).ok()?;
         let sender_address = String::from_utf8(sender_address_bytes).ok()?;
 
+        // Deserialize compression
+        let mut compression_bytes = [0u8; 4];
+        cursor.read_exact(&mut compression_bytes).ok()?;
+        let compression = Compression::from_u32(u32::from_le_bytes(compression_bytes))?;
+
         Some(Self {
             uuid,
             message_type,
             message_length,
             sender_address,
+            compression,
         })
     }
 
@@ -104,6 +116,7 @@ mod tests {
             message_type: 1,
             message_length: 42,
             sender_address: "127.0.0.1".to_string(),
+            compression: Compression::None,
         };
 
         let serialized = header.serialize();
@@ -114,6 +127,7 @@ mod tests {
         assert_eq!(header.message_type, deserialized.message_type);
         assert_eq!(header.message_length, deserialized.message_length);
         assert_eq!(header.sender_address, deserialized.sender_address);
+        assert_eq!(header.compression, deserialized.compression); // New line for compression check
     }
 
     #[test]
@@ -122,7 +136,8 @@ mod tests {
             "uuid": "550e8400-e29b-41d4-a716-446655440000",
             "message_type": 1,
             "message_length": 42,
-            "sender_address": "127.0.0.1"
+            "sender_address": "127.0.0.1",
+            "compression": "Gzip"
         }"#;
 
         let header = HeaderV1::from_json_string(json_str).unwrap();
@@ -130,6 +145,7 @@ mod tests {
         assert_eq!(header.message_type, 1);
         assert_eq!(header.message_length, 42);
         assert_eq!(header.sender_address, "127.0.0.1");
+        assert_eq!(header.compression, Compression::Gzip);
     }
 
     #[test]
@@ -139,6 +155,7 @@ mod tests {
             message_type: 1,
             message_length: 42,
             sender_address: "127.0.0.1".to_string(),
+            compression: Compression::None,
         };
 
         let json_str = header.to_json_string().unwrap();

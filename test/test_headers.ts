@@ -33,7 +33,7 @@ const testWhenBothServersSupportHeaders = async (): Promise<string> => {
     { sendWithHeaders: true, sendHeaderVersion: 1 }
   )
 
-  sn1.listen((data: any, remote, respond, headers) => {
+  sn1.listen((data: any) => {
     console.log('Received message on 44444:', data)
     if (data && data.message === 'pong') {
       console.log('Received pong from 44444:', data.fromPort)
@@ -52,6 +52,7 @@ const testWhenBothServersSupportHeaders = async (): Promise<string> => {
       console.log('Received pong from 44445:', data.fromPort)
       testResult = 'passed'
     }
+    console.log('Headers:', headers)
     return respond({ message: 'pong', fromPort: 44445 })
   })
 

@@ -4,7 +4,7 @@ import { Sn } from '../.'
 
 const NUMBER_OF_SOCKET_CLIENTS = 256 // Unique socket clients to be used for the bombardment
 const STARTING_PORT = 49153
-const NUMBER_OF_BOMBS: number = 10 // Number of socket bombs to be sent per socket client (-1 for infinite)
+const NUMBER_OF_BOMBS = 10 // Number of socket bombs to be sent per socket client (-1 for infinite)
 const TARGET_SOCKET_HOST = '127.0.0.1' // Internal host of the validator to be bombarded
 const TARGET_SOCKET_PORT = 49152 // Internal port of the validator to be bombarded
 const MESSAGE_JSON = { route: 'bombardment-test', payload: 'Hello, world!' } // Message to be sent to the validator
@@ -15,7 +15,7 @@ const RAMP_UP_EVERY_X_BOMBS = 10 // Number of bombs to be sent before ramping up
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const socketClients: any[] = []
-let metrics = {
+const metrics = {
   successfulSends: 0,
   failedSends: 0,
 }

@@ -1,3 +1,5 @@
+use crate::compression::compression::Compression;
+
 use super::header_v1::HeaderV1;
 
 pub enum Header {
@@ -20,6 +22,24 @@ impl Header {
     pub fn set_message_length(&mut self, message_length: u32) {
         match self {
             Header::V1(header_v1) => header_v1.message_length = message_length,
+        }
+    }
+
+    pub fn set_compression(&mut self, compression: Compression) {
+        match self {
+            Header::V1(header_v1) => header_v1.compression = compression,
+        }
+    }
+
+    pub fn compress(&self, message: Vec<u8>) -> Vec<u8> {
+        match self {
+            Header::V1(header_v1) => header_v1.compression.compress(&message),
+        }
+    }
+
+    pub fn decompress(&self, message: &[u8]) -> Option<Vec<u8>> {
+        match self {
+            Header::V1(header_v1) => header_v1.compression.decompress(message),
         }
     }
 }
