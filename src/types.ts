@@ -16,6 +16,7 @@ export interface AugmentedData {
   receivedTime: number // timestamp of when the message was received
   replyTime: number // timestamp of when the reply was received
   replyReceivedTime: number // timestamp of when the reply was received
+  timeout: number // timeout in ms
   msgDir: 'ask' | 'tell' | 'resp' // direction and intent of the message
 }
 
@@ -24,6 +25,7 @@ export const NewAugData = (
   UUID: string,
   port: number,
   address: string,
+  timeoutInMs: number,
   msgDir: 'ask' | 'tell' | 'resp'
 ): AugmentedData => {
   // Under the hood, sn needs to pass around some extra data for its own internal usage.
@@ -37,6 +39,7 @@ export const NewAugData = (
     receivedTime: 0,
     replyTime: 0,
     replyReceivedTime: 0,
+    timeout: timeoutInMs,
     msgDir,
   }
 }

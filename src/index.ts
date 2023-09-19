@@ -170,7 +170,7 @@ export const Sn = (opts: SnOpts) => {
       msgDir = 'tell'
     }
 
-    const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, msgDir)
+    const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
 
     const combinedHeaders: CombinedHeaders = {
       uuid: UUID,
@@ -210,7 +210,7 @@ export const Sn = (opts: SnOpts) => {
       msgDir = 'tell'
     }
 
-    const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, msgDir)
+    const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
 
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
@@ -244,6 +244,10 @@ export const Sn = (opts: SnOpts) => {
       const respond: ListenerResponder = (data?: unknown, headers?: AppHeaders) => {
         //we can do some timestamp work here for better logging.
         const replyTime = Date.now()
+        if (replyTime > augData.sendTime + augData.timeout) {
+          /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: reply time ${replyTime} is greater than timeout ${augData.sendTime + augData.timeout}. ignoring respond call`)
+          return
+        }
         const sendData = {
           data,
           UUID,
@@ -287,11 +291,8 @@ export const Sn = (opts: SnOpts) => {
         /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message not found in responseUUIDMapping`)
         const entry = timedOutUUIDMapping.get(UUID)
         if (entry != undefined) {
-          /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message was found in timedOutUUIDMapping`)
-          if (entry != undefined) {
-            /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message was found in timedOutUUIDMapping, timed out at ${entry.timedOutAt}, request created at ${entry.requestCreatedAt}, response received at ${Date.now()}`)
-            /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time taken for operation ${Date.now() - entry.requestCreatedAt}ms`)
-          }
+          /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message was found in timedOutUUIDMapping, timed out at ${entry.timedOutAt}, request created at ${entry.requestCreatedAt}, response received at ${Date.now()}`)
+          /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time taken for operation ${Date.now() - entry.requestCreatedAt}ms`)
           histogram.logData((Date.now() - entry.requestCreatedAt) / 1000)
           timedOutUUIDMapping.delete(UUID)
         }

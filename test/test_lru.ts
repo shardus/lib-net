@@ -73,7 +73,7 @@ const main = async () => {
   sn.listen(async (data: any, remote, respond, headers) => {
     if (data && data.message === 'ping') {
       console.log('Received ping from:', data.fromPort)
-      // await sleep(10000)
+      await sleep(10000)
       return respond({ message: 'pong', fromPort: +port })
     }
     if (data && data.message === 'pong') {
@@ -83,6 +83,10 @@ const main = async () => {
       console.log('Received headers:', JSON.stringify(headers, null, 2))
     }
   })
+}
+
+const sleep = (ms: number) => {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 main().catch((err) => console.log('ERROR: ', err))
