@@ -1,2 +1,2 @@
 [workspace]
-members = ["bespoke_binary", "parse_core", "shardus_net"]
+members = ["bespoke_binary", "shardus_net", "crypto"]

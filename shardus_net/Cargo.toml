@@ -9,7 +9,6 @@ exclude = ["index.node"]
 crate-type = ["cdylib"]
 
 [dependencies]
-parse_core = { path = "../parse_core" }
 bespoke_binary = { path = "../bespoke_binary" }
 tokio = { version = "1.13", features = [
   "io-util",

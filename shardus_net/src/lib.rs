@@ -18,9 +18,9 @@ mod shardus_net_listener;
 mod shardus_net_sender;
 mod stats;
 
+pub mod compression;
 mod header_factory;
 pub mod headers;
-pub mod compression;
 
 use ring_buffer::Stats as RingBufferStats;
 use runtime::RUNTIME;
@@ -392,7 +392,6 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
 
     info!("{}", bespoke_binary::get_hello_message());
-    info!("{}", parse_core::get_hello_message());
 
     cx.export_function("Sn", create_shardus_net)?;
 
