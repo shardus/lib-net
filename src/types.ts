@@ -47,6 +47,7 @@ export const NewAugData = (
 export type SnOpts = {
   port: number
   address?: string
+  signingSecretKeyHex: string
   senderOpts?: {
     useLruCache?: boolean
     lruSize: number

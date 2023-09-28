@@ -9,7 +9,7 @@ exclude = ["index.node"]
 crate-type = ["cdylib"]
 
 [dependencies]
-bespoke_binary = { path = "../bespoke_binary" }
+crypto = { path = "../crypto" }
 tokio = { version = "1.13", features = [
   "io-util",
   "sync",

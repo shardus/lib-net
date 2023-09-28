@@ -1,8 +1,0 @@
-[package]
-name = "bespoke_binary"
-version = "1.0.2"
-edition = "2018"
-
-
-[dev-dependencies]
-assert_approx_eq = "1.1.0"

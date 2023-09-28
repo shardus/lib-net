@@ -1,5 +1,7 @@
 use crate::header_factory::header_deserialize_factory;
 use crate::headers::header_types::WrappedHeader;
+use crate::message::Message;
+use crate::shardus_crypto;
 
 use super::runtime::RUNTIME;
 
@@ -104,34 +106,39 @@ impl ShardusNetListener {
 
             socket_stream.read_exact(&mut buffer).await?;
 
-            // TODO_HEADERS: we need to keep this message in buffer (vec<U8>) form longer until we get to
-            // code that parses the different kinds of messages.
-
             if !buffer.is_empty() && buffer[0] == 0x1 {
                 // Header is present
-                let header_version = buffer[1];
-                let msg_bytes = &buffer[2..];
+                let msg_bytes = &buffer[1..];
 
                 let mut cursor = Cursor::new(msg_bytes.to_vec());
-                let header = header_deserialize_factory(header_version, &mut cursor).expect("Failed to deserialize header");
-                let header_length = cursor.position() as usize;
+                let message = Message::deserialize(&mut cursor).expect("Failed to deserialize message");
 
-                let remaining_msg_bytes = &msg_bytes[(header_length)..];
+                if message.verify(shardus_crypto::get_shardus_crypto_instance()) == false {
+                    error!("Failed to verify message signature");
+                    continue;
+                }
+                println!("Message verified!");
 
-                if header.validate(remaining_msg_bytes.to_vec()) == false {
-                    error!("Failed to validate header");
+                let header_cursor = &mut Cursor::new(message.header);
+                let header = header_deserialize_factory(message.header_version, header_cursor).expect("Failed to deserialize header");
+
+                let data = message.data;
+
+                if header.validate(data.clone()) == false {
+                    error!("Failed to validate data with header");
                     continue;
                 }
 
                 let wrapped_header = WrappedHeader {
-                    version: header_version,
-                    header_json_string: header.to_json_string().expect("Failed to serialize header"),
+                    version: message.header_version,
+                    header_json_string: header.to_json_string().expect("Failed to serialize header to json string"),
                 };
 
-                let decompressed_msg_bytes = header.decompress(remaining_msg_bytes).expect("Failed to decompress message");
+                let decompressed_data_bytes = header.decompress(data.as_slice()).expect("Failed to decompress message");
 
                 // deserialize remaining bytes as your message
-                let msg = String::from_utf8(decompressed_msg_bytes.to_vec())?;
+                let msg = String::from_utf8(decompressed_data_bytes.to_vec())?;
+                println!("Received message: {}", msg);
                 received_msg_tx.send((msg, remote_addr, Some(wrapped_header))).map_err(|_| SendError(()))?;
             } else {
                 // No header present

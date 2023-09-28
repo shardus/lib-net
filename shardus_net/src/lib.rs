@@ -12,8 +12,10 @@ use log::LevelFilter;
 use lru::LruCache;
 use neon::{prelude::*, result::Throw};
 
+mod message;
 mod ring_buffer;
 mod runtime;
+mod shardus_crypto;
 mod shardus_net_listener;
 mod shardus_net_sender;
 mod stats;
@@ -42,9 +44,12 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let host = cx.argument::<JsString>(1)?.value(cx);
     let use_lru = cx.argument::<JsBoolean>(2)?.value(cx);
     let lru_size = cx.argument::<JsNumber>(3)?.value(cx);
+    let hex_signing_sk = cx.argument::<JsString>(4)?.value(cx);
+
+    let key_pair = shardus_crypto::get_shardus_crypto_instance().get_key_pair_using_sk(&crypto::HexStringOrBuffer::Hex(hex_signing_sk));
 
     let shardus_net_listener = create_shardus_net_listener(cx, port, host)?;
-    let shardus_net_sender = create_shardus_net_sender(use_lru, NonZeroUsize::new(lru_size as usize).unwrap());
+    let shardus_net_sender = create_shardus_net_sender(use_lru, NonZeroUsize::new(lru_size as usize).unwrap(), key_pair);
     let (stats, stats_incrementers) = Stats::new();
     let shardus_net_listener = cx.boxed(shardus_net_listener);
     let shardus_net_sender = cx.boxed(shardus_net_sender);
@@ -56,7 +61,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let listen = JsFunction::new(cx, listen)?;
     let send = JsFunction::new(cx, send)?;
     let send_with_headers = JsFunction::new(cx, send_with_headers)?;
-    let get_stats = JsFunction::new(cx, get_stats)?;
+    let get_stats: Handle<'_, JsFunction> = JsFunction::new(cx, get_stats)?;
     let evict_socket = JsFunction::new(cx, evict_socket)?;
 
     shardus_net.set(cx, "_listener", shardus_net_listener)?;
@@ -291,7 +296,7 @@ fn create_shardus_net_listener(cx: &mut FunctionContext, port: f64, host: String
     }
 }
 
-fn create_shardus_net_sender(use_lru: bool, lru_size: NonZeroUsize) -> Arc<ShardusNetSender> {
+fn create_shardus_net_sender(use_lru: bool, lru_size: NonZeroUsize, key_pair: crypto::KeyPair) -> Arc<ShardusNetSender> {
     let connections: Arc<Mutex<dyn ConnectionCache + Send>> = if use_lru {
         info!("Using LRU cache with size {} for socket mgmt", lru_size.get());
         Arc::new(Mutex::new(LruCache::new(lru_size)))
@@ -300,7 +305,7 @@ fn create_shardus_net_sender(use_lru: bool, lru_size: NonZeroUsize) -> Arc<Shard
         Arc::new(Mutex::new(HashMap::<SocketAddr, Arc<Connection>>::new()))
     };
 
-    Arc::new(ShardusNetSender::new(connections))
+    Arc::new(ShardusNetSender::new(key_pair, connections))
 }
 
 impl Finalize for ShardusNetListener {}
@@ -390,8 +395,6 @@ fn to_stats_object<'a>(cx: &mut impl Context<'a>, long_term_max: f64, long_term_
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
-
-    info!("{}", bespoke_binary::get_hello_message());
 
     cx.export_function("Sn", create_shardus_net)?;
 

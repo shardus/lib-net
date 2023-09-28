@@ -31,6 +31,7 @@ export const Sn = (opts: SnOpts) => {
   const ADDRESS = opts.address || DEFAULT_ADDRESS
   const USE_LRU_CACHE = (opts.senderOpts && opts.senderOpts.useLruCache) || false
   const LRU_SIZE = (opts.senderOpts && opts.senderOpts.lruSize) || 1028
+  const SIGNING_SECRET_KEY_HEX = opts.signingSecretKeyHex
 
   const HEADER_OPTS = opts.headerOpts || {
     sendWithHeaders: false,
@@ -38,7 +39,7 @@ export const Sn = (opts: SnOpts) => {
     enableDataCompression: true,
   }
 
-  const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE)
+  const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE, SIGNING_SECRET_KEY_HEX)
 
   // we're going to keep track of response IDs here
   const responseUUIDMapping: {
@@ -100,6 +101,7 @@ export const Sn = (opts: SnOpts) => {
       }
       if (HEADER_OPTS.sendWithHeaders && optionalHeader && stringifiedHeader !== null) {
         console.log('sending with headers')
+        console.log('reached #2')
         _net.send_with_headers(
           port,
           address,
@@ -109,6 +111,7 @@ export const Sn = (opts: SnOpts) => {
           sendCallback
         )
       } else {
+        console.log('reached #3')
         console.log('sending without headers')
         _net.send(port, address, stringifiedData, sendCallback)
       }
@@ -188,11 +191,6 @@ export const Sn = (opts: SnOpts) => {
     })
   }
 
-  // TODO_HEADERS I think we may need to send asks in the future with a node ID as well if we want to check
-  // for an already existing socket connection
-  // need to sort out the security though or else a node may be able to fake owning an ID unless we actually verify one
-  // signature from it. maybe the first header needs a signature? or maybe we need some way to ask shardus core
-  // if an incoming message from a certain public key is valid. This is a bit complex
   const send = async (
     port: number,
     address: string,
@@ -270,6 +268,8 @@ export const Sn = (opts: SnOpts) => {
         if (HEADER_OPTS.enableDataCompression) {
           combinedHeaders.compression = COMPRESSION_TECHNIQUE
         }
+
+        console.log('reached #1')
 
         //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)
         // @TODO: This error should be properly propagated and logged.
