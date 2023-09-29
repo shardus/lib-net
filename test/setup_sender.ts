@@ -12,10 +12,14 @@ const setupLruSender = () => {
         useLruCache: true,
         lruSize: 5,
       },
+      signingSecretKeyHex:
+        'c3774b92cc8850fb4026b073081290b82cab3c0f66cac250b4d710ee9aaf83ed8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d',
     })
   } else {
     return Sn({
       port,
+      signingSecretKeyHex:
+        'c3774b92cc8850fb4026b073081290b82cab3c0f66cac250b4d710ee9aaf83ed8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d',
     })
   }
 }

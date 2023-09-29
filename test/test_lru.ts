@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { Sn } from '../.'
 import { Command } from 'commander'
 
@@ -57,7 +56,7 @@ const main = async () => {
         { message, fromPort: +port },
         {
           message_type: 1,
-          sender_address: 'test',
+          sender_id: 'test',
         },
         1000
       )

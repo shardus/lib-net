@@ -25,7 +25,13 @@ const metrics = {
 function setupSocketClients() {
   for (let i = 0; i < NUMBER_OF_SOCKET_CLIENTS; i++) {
     const port = STARTING_PORT + i
-    socketClients.push(Sn({ port }))
+    socketClients.push(
+      Sn({
+        port,
+        signingSecretKeyHex:
+          'c3774b92cc8850fb4026b073081290b82cab3c0f66cac250b4d710ee9aaf83ed8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d',
+      })
+    )
   }
   console.log(`Socket clients created: ${socketClients.length}`)
 }
@@ -60,6 +66,7 @@ async function socketBombardment() {
       // console.log(`Sending message ${j + 1} of ${NUMBER_OF_SOCKET_CLIENTS}`)
       // eslint-disable-next-line security/detect-object-injection
       promises.push(
+        // eslint-disable-next-line security/detect-object-injection
         socketClients[j]
           .send(TARGET_SOCKET_PORT, TARGET_SOCKET_HOST, MESSAGE_JSON)
           .catch((err) => console.error(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS} failed. Error: ${err}`))
@@ -82,6 +89,7 @@ async function socketBombardmentWithLimitedActiveSockets(numberOfActiveSockets: 
       // eslint-disable-next-line security/detect-object-injection
       promises.push(() => {
         console.log(`Sending message ${j + 1} of ${socketClientsToUse}`)
+        // eslint-disable-next-line security/detect-object-injection
         return socketClients[j]
           .send(TARGET_SOCKET_PORT, TARGET_SOCKET_HOST, MESSAGE_JSON)
           .catch((err: Error) =>
@@ -92,8 +100,6 @@ async function socketBombardmentWithLimitedActiveSockets(numberOfActiveSockets: 
     await Promise.all(promises.map((p) => p()))
   }
 }
-
-async function socketBombardmentWithInRandomOrder() {}
 
 // console.log('Starting socket bombardment: socketBombardment')
 // socketBombardment()

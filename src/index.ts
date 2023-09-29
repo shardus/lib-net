@@ -34,7 +34,6 @@ export const Sn = (opts: SnOpts) => {
   const SIGNING_SECRET_KEY_HEX = opts.signingSecretKeyHex
 
   const HEADER_OPTS = opts.headerOpts || {
-    sendWithHeaders: false,
     sendHeaderVersion: 0,
     enableDataCompression: true,
   }
@@ -99,9 +98,8 @@ export const Sn = (opts: SnOpts) => {
           resolve()
         }
       }
-      if (HEADER_OPTS.sendWithHeaders && optionalHeader && stringifiedHeader !== null) {
+      if (optionalHeader && stringifiedHeader !== null) {
         console.log('sending with headers')
-        console.log('reached #2')
         _net.send_with_headers(
           port,
           address,
@@ -111,7 +109,6 @@ export const Sn = (opts: SnOpts) => {
           sendCallback
         )
       } else {
-        console.log('reached #3')
         console.log('sending without headers')
         _net.send(port, address, stringifiedData, sendCallback)
       }
@@ -178,10 +175,10 @@ export const Sn = (opts: SnOpts) => {
     const combinedHeaders: CombinedHeaders = {
       uuid: UUID,
       message_type: headers.message_type,
-      sender_address: headers.sender_address,
+      sender_id: headers.sender_id,
     }
 
-    if (HEADER_OPTS.sendHeaderVersion) {
+    if (HEADER_OPTS.enableDataCompression) {
       combinedHeaders.compression = COMPRESSION_TECHNIQUE
     }
 
@@ -200,8 +197,6 @@ export const Sn = (opts: SnOpts) => {
     onTimeout: TimeoutCallback = noop
   ) => {
     const UUID = uuid()
-    //TODO_HEADERS sending a port and address seems wrong here!! the response should come back over the existing socket
-    //seems like this was written as if we are udp
 
     let msgDir: 'ask' | 'tell' = 'ask'
     if (onResponse === noop) {
@@ -263,13 +258,11 @@ export const Sn = (opts: SnOpts) => {
         }
         if (headers) {
           combinedHeaders.message_type = headers.message_type
-          combinedHeaders.sender_address = headers.sender_address
+          combinedHeaders.sender_id = headers.sender_id
         }
         if (HEADER_OPTS.enableDataCompression) {
           combinedHeaders.compression = COMPRESSION_TECHNIQUE
         }
-
-        console.log('reached #1')
 
         //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)
         // @TODO: This error should be properly propagated and logged.
@@ -320,6 +313,7 @@ export const Sn = (opts: SnOpts) => {
           },
           headers
         )
+        return
       }
 
       extractUUIDHandleData(data, {
@@ -339,9 +333,9 @@ export const Sn = (opts: SnOpts) => {
     return _net.stopListening(server)
   }
 
-  const updateHeaderOpts = (opts: { sendWithHeaders: boolean; sendHeaderVersion: number }) => {
-    HEADER_OPTS.sendWithHeaders = opts.sendWithHeaders
+  const updateHeaderOpts = (opts: { sendHeaderVersion: number; enableDataCompression: boolean }) => {
     HEADER_OPTS.sendHeaderVersion = opts.sendHeaderVersion
+    HEADER_OPTS.enableDataCompression = opts.enableDataCompression
   }
 
   const stats = () => _net.stats()

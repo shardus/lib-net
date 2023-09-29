@@ -53,7 +53,6 @@ export type SnOpts = {
     lruSize: number
   }
   headerOpts?: {
-    sendWithHeaders: boolean
     sendHeaderVersion: number
     enableDataCompression: boolean
   }
@@ -89,13 +88,13 @@ export type ListenCallback = (data: unknown, remote: RemoteSender, respond: Resp
 
 export interface AppHeaders {
   message_type?: number
-  sender_address?: string
+  sender_id: string
 }
 
 export interface CombinedHeaders {
   uuid: string
   message_type?: number
-  sender_address?: string
+  sender_id?: string
   compression?: string
 }
 
