@@ -14,7 +14,7 @@ pub struct Message {
 #[derive(Debug)]
 pub struct Sign {
     pub owner: Vec<u8>,
-    pub signature: Vec<u8>,
+    pub sig: Vec<u8>,
 }
 
 impl Message {
@@ -46,7 +46,7 @@ impl Message {
         let unsigned = self.serialize_unsigned();
         let hash = crypto.hash(&unsigned, Buffer);
         let owner = self.sign.owner.clone();
-        let result = crypto.verify(&hash, &self.sign.signature, &crypto.get_pk(&crypto::HexStringOrBuffer::Buffer(owner)));
+        let result = crypto.verify(&hash, &self.sign.sig, &crypto.get_pk(&crypto::HexStringOrBuffer::Buffer(owner)));
         result
     }
 
@@ -115,7 +115,7 @@ impl Message {
 
 impl Sign {
     pub fn new(owner: Vec<u8>, signature: Vec<u8>) -> Sign {
-        Sign { owner, signature }
+        Sign { owner, sig: signature }
     }
 
     pub fn serialize(&self) -> Vec<u8> {
@@ -128,8 +128,8 @@ impl Sign {
         buffer.write_all(&owner_bytes).unwrap();
 
         // Serialize signature length and signature
-        let signature_len = self.signature.len() as u32;
-        let signature_bytes = self.signature.clone();
+        let signature_len = self.sig.len() as u32;
+        let signature_bytes = self.sig.clone();
         buffer.write_all(&signature_len.to_le_bytes()).unwrap();
         buffer.write_all(&signature_bytes).unwrap();
 
@@ -154,5 +154,28 @@ impl Sign {
         let signature = signature_bytes;
 
         Some(Sign::new(owner, signature))
+    }
+
+    pub fn to_json_string(&self) -> String {
+        let owner_hex = self.owner.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join("");
+        let signature_hex = self.sig.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join("");
+
+        format!("{{\"owner\": \"{}\", \"sig\": \"{}\"}}", owner_hex, signature_hex)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_json_string() {
+        let sign = Sign {
+            owner: vec![0x12, 0x34, 0x56, 0x78],
+            sig: vec![0x9a, 0xbc, 0xde, 0xf0],
+        };
+
+        let expected_json_string = "{\"owner\": \"12345678\", \"signature\": \"9abcdef0\"}";
+        assert_eq!(sign.to_json_string(), expected_json_string);
     }
 }

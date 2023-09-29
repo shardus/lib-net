@@ -1,6 +1,6 @@
 use super::runtime::RUNTIME;
 use crate::header_factory::{header_serialize_factory, wrap_serialized_message};
-use crate::headers::header_types::Header;
+use crate::header::header_types::Header;
 use crate::message::Message;
 use crate::oneshot::Sender;
 use crate::shardus_crypto;
@@ -58,8 +58,8 @@ impl ShardusNetSender {
             .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
     }
 
-    // send_with_headers: send data to a socket address with a header and signature
-    pub fn send_with_headers(&self, address: SocketAddr, header_version: u8, mut header: Header, data: Vec<u8>, complete_tx: Sender<SendResult>) {
+    // send_with_header: send data to a socket address with a header and signature
+    pub fn send_with_header(&self, address: SocketAddr, header_version: u8, mut header: Header, data: Vec<u8>, complete_tx: Sender<SendResult>) {
         let compressed_data = header.compress(data);
         header.set_message_length(compressed_data.len() as u32);
         let serialized_header = header_serialize_factory(header_version, header).expect("Failed to serialize header");
@@ -68,7 +68,7 @@ impl ShardusNetSender {
         let serialized_message = wrap_serialized_message(message.serialize());
         self.send_channel
             .send((address, serialized_message, complete_tx))
-            .expect("Unexpected! Failed to send data with headers to channel. Sender task must have been dropped.");
+            .expect("Unexpected! Failed to send data with header to channel. Sender task must have been dropped.");
     }
 
     pub fn evict_socket(&self, address: SocketAddr) {

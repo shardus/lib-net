@@ -7,7 +7,7 @@ pub enum Header {
 }
 
 impl Header {
-    pub fn to_json_string(&self) -> Option<String> {
+    pub fn to_json_string(&self) -> String {
         match self {
             Header::V1(header_v1) => header_v1.to_json_string(),
         }
@@ -44,7 +44,9 @@ impl Header {
     }
 }
 
-pub struct WrappedHeader {
+#[derive(Debug)]
+pub struct RequestMetadata {
     pub version: u8,
     pub header_json_string: String,
+    pub sign_json_string: String,
 }

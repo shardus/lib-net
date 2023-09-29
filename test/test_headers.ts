@@ -15,25 +15,21 @@ const main = async () => {
   console.log('Starting servers...')
   let failed = 0
   let passed = 0
-  const result1 = await testWhenBothServersSupportHeaders()
+  const result1 = await testWhenBothServersSupportHeader()
   result1 === 'passed' ? passed++ : failed++
-  const result2 = await testWhenReceiverSupportHeaders()
+  const result2 = await testWhenReceiverSupportHeader()
   result2 === 'passed' ? passed++ : failed++
   console.log(`Passed: ${passed}, Failed: ${failed}`)
-  const result3 = await testWhenSenderSupportHeaders()
+  const result3 = await testWhenSenderSupportHeader()
   result3 === 'passed' ? passed++ : failed++
   console.log(`Passed: ${passed}, Failed: ${failed}`)
 }
 
-const testWhenBothServersSupportHeaders = async (): Promise<string> => {
+const testWhenBothServersSupportHeader = async (): Promise<string> => {
   let testResult = 'failed'
 
   // setup test servers
-  const sn1 = setupSender(
-    44444,
-    { useLruCache: true, lruSize: 2 },
-    { sendWithHeaders: true, sendHeaderVersion: 1 }
-  )
+  const sn1 = setupSender(44444, { useLruCache: true, lruSize: 2 }, { sendHeaderVersion: 1 })
 
   sn1.listen((data: any) => {
     console.log('Received message on 44444:', data)
@@ -43,18 +39,14 @@ const testWhenBothServersSupportHeaders = async (): Promise<string> => {
     }
   })
 
-  const sn2 = setupSender(
-    44445,
-    { useLruCache: true, lruSize: 2 },
-    { sendWithHeaders: true, sendHeaderVersion: 1 }
-  )
-  sn2.listen((data: any, remote, respond, headers) => {
+  const sn2 = setupSender(44445, { useLruCache: true, lruSize: 2 }, { sendHeaderVersion: 1 })
+  sn2.listen((data: any, remote, respond, header) => {
     console.log('Received message on 44445:', data)
     if (data && data.message === 'ping') {
       console.log('Received pong from 44445:', data.fromPort)
       testResult = 'passed'
     }
-    console.log('Headers:', headers)
+    console.log('Header:', header)
     return respond({ message: 'pong', fromPort: 44445 })
   })
 
@@ -74,13 +66,13 @@ const testWhenBothServersSupportHeaders = async (): Promise<string> => {
   return testResult
 }
 
-const testWhenReceiverSupportHeaders = async (): Promise<string> => {
+const testWhenReceiverSupportHeader = async (): Promise<string> => {
   let testResult = 'failed'
 
   // setup test servers
   const sn1 = setupSender(44446, { useLruCache: true, lruSize: 2 }, {})
 
-  sn1.listen((data: any, remote, respond, headers) => {
+  sn1.listen((data: any, remote, respond, header) => {
     console.log('Received message on 44444:', data)
     if (data && data.message === 'pong') {
       console.log('Received pong from 44444:', data.fromPort)
@@ -91,9 +83,9 @@ const testWhenReceiverSupportHeaders = async (): Promise<string> => {
   const sn2 = setupSender(
     44447,
     { useLruCache: true, lruSize: 2 },
-    { sendWithHeaders: true, sendHeaderVersion: 1 }
+    { sendHeaderVersion: 1 }
   )
-  sn2.listen((data: any, remote, respond, headers) => {
+  sn2.listen((data: any, remote, respond, header) => {
     console.log('Received message on 44445:', data)
     if (data && data.message === 'ping') {
       console.log('Received pong from 44445:', data.fromPort)
@@ -109,17 +101,17 @@ const testWhenReceiverSupportHeaders = async (): Promise<string> => {
   return testResult
 }
 
-const testWhenSenderSupportHeaders = async (): Promise<string> => {
+const testWhenSenderSupportHeader = async (): Promise<string> => {
   let testResult = 'failed'
 
   // setup test servers
   const sn1 = setupSender(
     44448,
     { useLruCache: true, lruSize: 2 },
-    { sendWithHeaders: true, sendHeaderVersion: 1 }
+    {sendHeaderVersion: 1 }
   )
 
-  sn1.listen((data: any, remote, respond, headers) => {
+  sn1.listen((data: any, remote, respond, header) => {
     console.log('Received message on 44444:', data)
     if (data && data.message === 'pong') {
       console.log('Received pong from 44444:', data.fromPort)
@@ -128,7 +120,7 @@ const testWhenSenderSupportHeaders = async (): Promise<string> => {
   })
 
   const sn2 = setupSender(44449, { useLruCache: true, lruSize: 2 }, {})
-  sn2.listen((data: any, remote, respond, headers) => {
+  sn2.listen((data: any, remote, respond, header) => {
     console.log('Received message on 44445:', data)
     if (data && data.message === 'ping') {
       console.log('Received pong from 44445:', data.fromPort)

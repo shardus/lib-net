@@ -15,6 +15,10 @@ pub struct HeaderV1 {
     pub message_length: u32,
     #[serde(default)]
     pub sender_id: String,
+    #[serde(default)]
+    pub tracker_id: String,
+    #[serde(default)]
+    pub verification_data: String,
     #[serde(default = "Compression::default")]
     pub compression: Compression,
 }
@@ -38,6 +42,18 @@ impl HeaderV1 {
         let sender_id_len = sender_id_bytes.len() as u32;
         buffer.write_all(&sender_id_len.to_le_bytes()).unwrap();
         buffer.write_all(sender_id_bytes).unwrap();
+
+        // Serialize tracker_id as bytes and then its length (4 bytes)
+        let tracker_id_bytes = self.tracker_id.as_bytes();
+        let tracker_id_len = tracker_id_bytes.len() as u32;
+        buffer.write_all(&tracker_id_len.to_le_bytes()).unwrap();
+        buffer.write_all(tracker_id_bytes).unwrap();
+
+        // Serialize sender_id as bytes and then its length (4 bytes)
+        let verification_data_bytes = self.verification_data.as_bytes();
+        let verification_data_len = verification_data_bytes.len() as u32;
+        buffer.write_all(&verification_data_len.to_le_bytes()).unwrap();
+        buffer.write_all(verification_data_bytes).unwrap();
 
         // Serialize compression (4 bytes)
         buffer.write_all(&self.compression.to_u32().to_le_bytes()).unwrap();
@@ -71,6 +87,24 @@ impl HeaderV1 {
         cursor.read_exact(&mut sender_id_bytes).ok()?;
         let sender_id = String::from_utf8(sender_id_bytes).ok()?;
 
+        // Deserialize tracker_id
+        let mut tracker_id_len_bytes = [0u8; 4];
+        cursor.read_exact(&mut tracker_id_len_bytes).ok()?;
+        let tracker_id_len = u32::from_le_bytes(tracker_id_len_bytes);
+
+        let mut tracker_id_bytes = vec![0u8; tracker_id_len as usize];
+        cursor.read_exact(&mut tracker_id_bytes).ok()?;
+        let tracker_id = String::from_utf8(tracker_id_bytes).ok()?;
+
+        // Deserialize verification_data
+        let mut verification_data_len_bytes = [0u8; 4];
+        cursor.read_exact(&mut verification_data_len_bytes).ok()?;
+        let verification_data_len = u32::from_le_bytes(verification_data_len_bytes);
+
+        let mut verification_data_bytes = vec![0u8; verification_data_len as usize];
+        cursor.read_exact(&mut verification_data_bytes).ok()?;
+        let verification_data = String::from_utf8(verification_data_bytes).ok()?;
+
         // Deserialize compression
         let mut compression_bytes = [0u8; 4];
         cursor.read_exact(&mut compression_bytes).ok()?;
@@ -80,7 +114,9 @@ impl HeaderV1 {
             uuid,
             message_type,
             message_length,
-            sender_id: sender_id,
+            sender_id,
+            tracker_id,
+            verification_data,
             compression,
         })
     }
@@ -89,11 +125,11 @@ impl HeaderV1 {
         serde_json::from_str(json_str).ok()
     }
 
-    pub fn to_json_string(&self) -> Option<String> {
-        Some(format!(
-            r#"{{"uuid": "{}", "message_type": {}, "message_length": {}, "sender_id": "{}"}}"#,
-            self.uuid, self.message_type, self.message_length, self.sender_id
-        ))
+    pub fn to_json_string(&self) -> String {
+        format!(
+            r#"{{"uuid": "{}", "message_type": {}, "message_length": {}, "sender_id": "{}", "tracker_id": "{}", "verification_data": "{}"}}"#,
+            self.uuid, self.message_type, self.message_length, self.sender_id, self.tracker_id, self.verification_data
+        )
     }
 
     pub fn validate(&self, message: Vec<u8>) -> bool {
@@ -115,7 +151,9 @@ mod tests {
             uuid: Uuid::new_v4(),
             message_type: 1,
             message_length: 42,
-            sender_id: "127.0.0.1".to_string(),
+            sender_id: "sender_1".to_string(),
+            tracker_id: "tracker_1".to_string(),
+            verification_data: "verification_data_1".to_string(),
             compression: Compression::None,
         };
 
@@ -154,14 +192,16 @@ mod tests {
             uuid: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             message_type: 1,
             message_length: 42,
-            sender_id: "127.0.0.1".to_string(),
+            sender_id: "sender_1".to_string(),
+            tracker_id: "tracker_1".to_string(),
+            verification_data: "verification_data_1".to_string(),
             compression: Compression::None,
         };
 
-        let json_str = header.to_json_string().unwrap();
+        let json_str = header.to_json_string();
         assert_eq!(
             json_str,
-            r#"{"uuid": "550e8400-e29b-41d4-a716-446655440000", "message_type": 1, "message_length": 42, "sender_id": "127.0.0.1"}"#
+            r#"{"uuid": "550e8400-e29b-41d4-a716-446655440000", "message_type": 1, "message_length": 42, "sender_id": "sender_1", "tracker_id": "tracker_1", "verification_data": "verification_data_1"}"#
         );
     }
 }

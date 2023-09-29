@@ -1,13 +1,13 @@
 import * as uuid from 'uuid/v1'
 import {
-  AppHeaders,
+  AppHeader,
   AugmentedData,
-  CombinedHeaders,
-  CompressionTechnique,
+  CombinedHeader,
   ListenerResponder,
   NewAugData,
   RemoteSender,
   ResponseCallback,
+  Sign,
   SnOpts,
   TimeoutCallback,
   validateSnOpts,
@@ -19,8 +19,6 @@ import { TTLMap } from './util/TTLMap'
 const net = require('../../shardus-net.node')
 
 const DEFAULT_ADDRESS = '0.0.0.0'
-
-const COMPRESSION_TECHNIQUE: CompressionTechnique = 'Gzip'
 
 const noop = () => {}
 
@@ -35,7 +33,6 @@ export const Sn = (opts: SnOpts) => {
 
   const HEADER_OPTS = opts.headerOpts || {
     sendHeaderVersion: 0,
-    enableDataCompression: true,
   }
 
   const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE, SIGNING_SECRET_KEY_HEX)
@@ -62,7 +59,7 @@ export const Sn = (opts: SnOpts) => {
 
   /**
    * This sends our data the that is wrapped in an augData structure
-   * a new function will be added similar to this one to send data with headers
+   * a new function will be added similar to this one to send data with header
    * @param port
    * @param address
    * @param augData
@@ -80,7 +77,7 @@ export const Sn = (opts: SnOpts) => {
     onTimeout: TimeoutCallback,
     optionalHeader?: {
       version: number
-      headerData: CombinedHeaders
+      headerData: CombinedHeader
     }
   ) => {
     const stringifiedData = stringifyData(augData, opts.customStringifier)
@@ -99,8 +96,8 @@ export const Sn = (opts: SnOpts) => {
         }
       }
       if (optionalHeader && stringifiedHeader !== null) {
-        console.log('sending with headers')
-        _net.send_with_headers(
+        console.log('sending with header')
+        _net.send_with_header(
           port,
           address,
           optionalHeader.version,
@@ -109,7 +106,7 @@ export const Sn = (opts: SnOpts) => {
           sendCallback
         )
       } else {
-        console.log('sending without headers')
+        console.log('sending without header')
         _net.send(port, address, stringifiedData, sendCallback)
       }
 
@@ -154,11 +151,11 @@ export const Sn = (opts: SnOpts) => {
     })
   }
 
-  const sendWithHeaders = async (
+  const sendWithHeader = async (
     port: number,
     address: string,
     data: unknown,
-    headers: AppHeaders,
+    header: AppHeader,
     timeout = 0,
     onResponse: ResponseCallback = noop,
     onTimeout: TimeoutCallback = noop
@@ -172,19 +169,15 @@ export const Sn = (opts: SnOpts) => {
 
     const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
 
-    const combinedHeaders: CombinedHeaders = {
+    const combinedHeader: CombinedHeader = {
       uuid: UUID,
-      message_type: headers.message_type,
-      sender_id: headers.sender_id,
-    }
-
-    if (HEADER_OPTS.enableDataCompression) {
-      combinedHeaders.compression = COMPRESSION_TECHNIQUE
+      message_type: header.message_type,
+      sender_id: header.sender_id,
     }
 
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout, {
       version: HEADER_OPTS.sendHeaderVersion,
-      headerData: combinedHeaders,
+      headerData: combinedHeader,
     })
   }
 
@@ -213,13 +206,19 @@ export const Sn = (opts: SnOpts) => {
       data: unknown,
       remote: RemoteSender,
       respond: ListenerResponder,
-      headers?: AppHeaders
+      header?: AppHeader,
+      sign?: Sign
     ) => void
   ) => {
     // This is a wrapped form of the 'handleData' callback the user supplied.
     // Its job is to determine if the incoming data is a response to a request
     // the user sent. It does this by referencing the UUID map object.
-    const extractUUIDHandleData = (augDataStr: string, remote: RemoteSender, headers?: AppHeaders) => {
+    const extractUUIDHandleData = (
+      augDataStr: string,
+      remote: RemoteSender,
+      header?: AppHeader,
+      sign?: Sign
+    ) => {
       // [TODO] Secure this with validation
       let augData: AugmentedData = JSON.parse(augDataStr, base64BufferReviver)
 
@@ -234,7 +233,7 @@ export const Sn = (opts: SnOpts) => {
       const receivedTime = Date.now()
       // This is the return send function. A user will call this if they want
       // to "reply" or "respond" to an incoming message.
-      const respond: ListenerResponder = (data?: unknown, headers?: AppHeaders) => {
+      const respond: ListenerResponder = (data?: unknown, header?: AppHeader) => {
         //we can do some timestamp work here for better logging.
         const replyTime = Date.now()
         if (replyTime > augData.sendTime + augData.timeout) {
@@ -253,22 +252,22 @@ export const Sn = (opts: SnOpts) => {
           msgDir: 'resp',
         }
 
-        const combinedHeaders: CombinedHeaders = {
+        const combinedHeader: CombinedHeader = {
           uuid: UUID,
         }
-        if (headers) {
-          combinedHeaders.message_type = headers.message_type
-          combinedHeaders.sender_id = headers.sender_id
-        }
-        if (HEADER_OPTS.enableDataCompression) {
-          combinedHeaders.compression = COMPRESSION_TECHNIQUE
+        if (header) {
+          combinedHeader.message_type = header.message_type
+          combinedHeader.sender_id = header.sender_id
+          combinedHeader.tracker_id = header.tracker_id
+          combinedHeader.verification_data = header.verification_data
+          combinedHeader.compression = header.compression
         }
 
         //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)
         // @TODO: This error should be properly propagated and logged.
         return _sendAug(PORT, address, sendData, 0, noop, noop, {
           version: HEADER_OPTS.sendHeaderVersion,
-          headerData: combinedHeaders,
+          headerData: combinedHeader,
         }).catch(console.error)
       }
 
@@ -294,24 +293,28 @@ export const Sn = (opts: SnOpts) => {
       // Clear the respond mechanism.
       delete responseUUIDMapping[UUID]
 
-      return handle(data, remote, respond, headers)
+      return handle(data, remote, respond, header, sign)
     }
 
     // OLD comment from initial implementation:
     // TODO these should be spun up in parallel, but that convolutes code
     // and doesn't save hardly any startup time, so skipping for now.
     // const server = await _net.listen(PORT, ADDRESS, extractUUIDHandleData)
-    const server = await _net.listen((data, remoteIp, remotePort, headerVersion?, headerData?) => {
-      if (headerVersion !== null && headerData !== null) {
-        console.log(`received with headers version: ${headerVersion}`)
-        const headers: AppHeaders = JSON.parse(headerData)
+    const server = await _net.listen((data, remoteIp, remotePort, headerVersion?, headerData?, signData?) => {
+      if (headerVersion && headerData && signData) {
+        console.log(`received with header version: ${headerVersion}`)
+        const header: AppHeader = JSON.parse(headerData)
+        console.log(`received with header: ${JSON.stringify(header)}`)
+        console.log(`received with sign: ${signData}`)
+        const sign: Sign = JSON.parse(signData)
         extractUUIDHandleData(
           data,
           {
             address: remoteIp,
             port: remotePort,
           },
-          headers
+          header,
+          sign
         )
         return
       }
@@ -333,14 +336,21 @@ export const Sn = (opts: SnOpts) => {
     return _net.stopListening(server)
   }
 
-  const updateHeaderOpts = (opts: { sendHeaderVersion: number; enableDataCompression: boolean }) => {
+  const updateHeaderOpts = (opts: { sendHeaderVersion: number }) => {
     HEADER_OPTS.sendHeaderVersion = opts.sendHeaderVersion
-    HEADER_OPTS.enableDataCompression = opts.enableDataCompression
   }
 
   const stats = () => _net.stats()
 
-  const returnVal = { send, sendWithHeaders, listen, stopListening, stats, evictSocket, updateHeaderOpts }
+  const returnVal = {
+    send,
+    sendWithHeader: sendWithHeader,
+    listen,
+    stopListening,
+    stats,
+    evictSocket,
+    updateHeaderOpts,
+  }
 
   return returnVal
 }

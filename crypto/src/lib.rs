@@ -214,7 +214,7 @@ mod tests {
 
         let some_hex_string = "1234567890abcdef".to_string();
 
-        let result = sc.verify(&some_hex_string, &HexStringOrBuffer::Hex(nodejs_signed_sig), &pk);
+        let result = sc.verify(&HexStringOrBuffer::Hex(some_hex_string), &nodejs_signed_sig.as_bytes().to_vec(), &pk);
 
         assert_eq!(true, result);
     }

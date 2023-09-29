@@ -5,15 +5,14 @@ const setupLruSender = (port: number, lruSize: number) => {
   return Sn({
     port,
     address: '127.0.0.1',
-    signingSecretKeyHex: "c3774b92cc8850fb4026b073081290b82cab3c0f66cac250b4d710ee9aaf83ed8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d",
+    signingSecretKeyHex:
+      'c3774b92cc8850fb4026b073081290b82cab3c0f66cac250b4d710ee9aaf83ed8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d',
     senderOpts: {
       useLruCache: true,
       lruSize: lruSize,
     },
     headerOpts: {
       sendHeaderVersion: 1,
-      sendWithHeaders: true,
-      enableDataCompression: true,
     },
   })
 }
@@ -50,7 +49,7 @@ const main = async () => {
     const inputs = data.toString().trim().split(' ')
     if (inputs.length === 3) {
       const message = inputs[2]
-      await sn.sendWithHeaders(
+      await sn.sendWithHeader(
         +inputs[1],
         '127.0.0.1',
         { message, fromPort: +port },
@@ -70,7 +69,7 @@ const main = async () => {
     }
   })
 
-  sn.listen(async (data: any, remote, respond, headers) => {
+  sn.listen(async (data: any, remote, respond, header, sign) => {
     if (data && data.message === 'ping') {
       console.log('Received ping from:', data.fromPort)
       // await sleep(10000)
@@ -79,8 +78,11 @@ const main = async () => {
     if (data && data.message === 'pong') {
       console.log('Received pong from:', data.fromPort)
     }
-    if (headers) {
-      console.log('Received headers:', JSON.stringify(headers, null, 2))
+    if (header) {
+      console.log('Received header:', JSON.stringify(header, null, 2))
+    }
+    if (sign) {
+      console.log('Received signature:', JSON.stringify(sign, null, 2))
     }
   })
 }

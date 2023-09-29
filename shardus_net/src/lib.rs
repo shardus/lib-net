@@ -22,7 +22,7 @@ mod stats;
 
 pub mod compression;
 mod header_factory;
-pub mod headers;
+pub mod header;
 
 use ring_buffer::Stats as RingBufferStats;
 use runtime::RUNTIME;
@@ -60,7 +60,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
 
     let listen = JsFunction::new(cx, listen)?;
     let send = JsFunction::new(cx, send)?;
-    let send_with_headers = JsFunction::new(cx, send_with_headers)?;
+    let send_with_header = JsFunction::new(cx, send_with_header)?;
     let get_stats: Handle<'_, JsFunction> = JsFunction::new(cx, get_stats)?;
     let evict_socket = JsFunction::new(cx, evict_socket)?;
 
@@ -70,7 +70,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     shardus_net.set(cx, "_stats_incrementers", stats_incrementers)?;
     shardus_net.set(cx, "listen", listen)?;
     shardus_net.set(cx, "send", send)?;
-    shardus_net.set(cx, "send_with_headers", send_with_headers)?;
+    shardus_net.set(cx, "send_with_header", send_with_header)?;
     shardus_net.set(cx, "evict_socket", evict_socket)?;
     shardus_net.set(cx, "stats", get_stats)?;
 
@@ -96,7 +96,7 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         // rx is the UnboundedReceiver<(String, SocketAddr)> that is returned from listen.
         // all received messages are sent to the UnboundedSender.  here we call recv to
         // get messages from the UnboundedReceiver.  recv is a blocking call
-        while let Some((msg, remote_address, optional_wrapped_header)) = rx.recv().await {
+        while let Some((msg, remote_address, optional_request_metadata)) = rx.recv().await {
             let callback = callback.clone();
             let this = this.clone();
             let channel = channel.clone();
@@ -121,17 +121,29 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     let message = cx.string(msg);
                     let remote_ip = cx.string(remote_address.ip().to_string());
                     let remote_port = cx.number(remote_address.port());
-                    let optional_js_version: neon::handle::Handle<'_, neon::prelude::JsValue> = match &optional_wrapped_header {
-                        Some(wrapped_header) => cx.number(wrapped_header.version as f64).upcast(),
+                    let optional_header_version: neon::handle::Handle<'_, neon::prelude::JsValue> = match &optional_request_metadata {
+                        Some(request_metadata) => cx.number(request_metadata.version as f64).upcast(),
                         None => cx.null().upcast(),
                     };
 
-                    let optional_js_json_string: neon::handle::Handle<'_, neon::prelude::JsValue> = match &optional_wrapped_header {
-                        Some(wrapped_header) => cx.string(&wrapped_header.header_json_string).upcast(),
+                    let optional_header_json_string: neon::handle::Handle<'_, neon::prelude::JsValue> = match &optional_request_metadata {
+                        Some(request_metadata) => cx.string(&request_metadata.header_json_string).upcast(),
                         None => cx.null().upcast(),
                     };
 
-                    let args: [Handle<JsValue>; 5] = [message.upcast(), remote_ip.upcast(), remote_port.upcast(), optional_js_version, optional_js_json_string];
+                    let optional_sign_json_string: neon::handle::Handle<'_, neon::prelude::JsValue> = match &optional_request_metadata {
+                        Some(request_metadata) => cx.string(&request_metadata.sign_json_string).upcast(),
+                        None => cx.null().upcast(),
+                    };
+
+                    let args: [Handle<JsValue>; 6] = [
+                        message.upcast(),
+                        remote_ip.upcast(),
+                        remote_port.upcast(),
+                        optional_header_version,
+                        optional_header_json_string,
+                        optional_sign_json_string,
+                    ];
 
                     callback.to_inner(cx).call(cx, this, args)?;
 
@@ -194,7 +206,7 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     }
 }
 
-pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+pub fn send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
     let port: u16 = cx.argument::<JsNumber>(0)?.value(cx) as u16;
     let host: String = cx.argument::<JsString>(1)?.value(cx) as String;
@@ -249,7 +261,7 @@ pub fn send_with_headers(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     match (host, port as u16).to_socket_addrs() {
         Ok(mut address) => {
             let address = address.next().expect("Expected at least one address");
-            shardus_net_sender.send_with_headers(address, header_version, header, data, complete_tx);
+            shardus_net_sender.send_with_header(address, header_version, header, data, complete_tx);
 
             Ok(cx.undefined())
         }

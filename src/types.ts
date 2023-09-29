@@ -54,7 +54,6 @@ export type SnOpts = {
   }
   headerOpts?: {
     sendHeaderVersion: number
-    enableDataCompression: boolean
   }
   customStringifier?: (val) => string
 }
@@ -80,22 +79,32 @@ export interface RemoteSender {
 
 export type ResponseCallback = (data?: unknown) => void
 
-export type ListenerResponder = (data?: unknown, headers?: AppHeaders) => void
+export type ListenerResponder = (data?: unknown, header?: AppHeader) => void
 
 export type TimeoutCallback = () => void
 
 export type ListenCallback = (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void
 
-export interface AppHeaders {
+export interface AppHeader {
   message_type?: number
-  sender_id: string
+  sender_id?: string
+  tracker_id?: string
+  verification_data?: string
+  compression?: string
 }
 
-export interface CombinedHeaders {
+export interface CombinedHeader {
   uuid: string
   message_type?: number
   sender_id?: string
+  tracker_id?: string
+  verification_data?: string
   compression?: string
 }
 
 export type CompressionTechnique = 'Gzip' | 'Brotli'
+
+export interface Sign {
+  owner: string
+  sig: string
+}

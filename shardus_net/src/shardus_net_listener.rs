@@ -1,5 +1,5 @@
 use crate::header_factory::header_deserialize_factory;
-use crate::headers::header_types::WrappedHeader;
+use crate::header::header_types::RequestMetadata;
 use crate::message::Message;
 use crate::shardus_crypto;
 
@@ -41,17 +41,17 @@ impl ShardusNetListener {
         Ok(Self { address })
     }
 
-    pub fn listen(&self) -> UnboundedReceiver<(String, SocketAddr, Option<WrappedHeader>)> {
+    pub fn listen(&self) -> UnboundedReceiver<(String, SocketAddr, Option<RequestMetadata>)> {
         Self::spawn_listener(self.address)
     }
 
-    fn spawn_listener(address: SocketAddr) -> UnboundedReceiver<(String, SocketAddr, Option<WrappedHeader>)> {
+    fn spawn_listener(address: SocketAddr) -> UnboundedReceiver<(String, SocketAddr, Option<RequestMetadata>)> {
         let (tx, rx) = unbounded_channel();
         RUNTIME.spawn(Self::bind_to_socket(address, tx));
         rx
     }
 
-    async fn bind_to_socket(address: SocketAddr, tx: UnboundedSender<(String, SocketAddr, Option<WrappedHeader>)>) {
+    async fn bind_to_socket(address: SocketAddr, tx: UnboundedSender<(String, SocketAddr, Option<RequestMetadata>)>) {
         loop {
             let listener = TcpListener::bind(address).await;
 
@@ -72,7 +72,7 @@ impl ShardusNetListener {
         }
     }
 
-    async fn accept_connections(listener: TcpListener, received_msg_tx: UnboundedSender<(String, SocketAddr, Option<WrappedHeader>)>) -> std::io::Result<()> {
+    async fn accept_connections(listener: TcpListener, received_msg_tx: UnboundedSender<(String, SocketAddr, Option<RequestMetadata>)>) -> std::io::Result<()> {
         loop {
             let (socket, remote_addr) = listener.accept().await?;
             let received_msg_tx = received_msg_tx.clone();
@@ -89,7 +89,7 @@ impl ShardusNetListener {
         }
     }
 
-    async fn receive(socket_stream: TcpStream, remote_addr: SocketAddr, received_msg_tx: UnboundedSender<(String, SocketAddr, Option<WrappedHeader>)>) -> ListenerResult<()> {
+    async fn receive(socket_stream: TcpStream, remote_addr: SocketAddr, received_msg_tx: UnboundedSender<(String, SocketAddr, Option<RequestMetadata>)>) -> ListenerResult<()> {
         let mut socket_stream = socket_stream;
         while let Ok(msg_len) = socket_stream.read_u32().await {
             let msg_len = msg_len as usize;
@@ -129,9 +129,10 @@ impl ShardusNetListener {
                     continue;
                 }
 
-                let wrapped_header = WrappedHeader {
+                let request_metadata = RequestMetadata {
                     version: message.header_version,
-                    header_json_string: header.to_json_string().expect("Failed to serialize header to json string"),
+                    header_json_string: header.to_json_string(),
+                    sign_json_string: message.sign.to_json_string(),
                 };
 
                 let decompressed_data_bytes = header.decompress(data.as_slice()).expect("Failed to decompress message");
@@ -139,7 +140,7 @@ impl ShardusNetListener {
                 // deserialize remaining bytes as your message
                 let msg = String::from_utf8(decompressed_data_bytes.to_vec())?;
                 println!("Received message: {}", msg);
-                received_msg_tx.send((msg, remote_addr, Some(wrapped_header))).map_err(|_| SendError(()))?;
+                received_msg_tx.send((msg, remote_addr, Some(request_metadata))).map_err(|_| SendError(()))?;
             } else {
                 // No header present
                 let msg = String::from_utf8(buffer)?;
