@@ -10,8 +10,6 @@ use serde::Deserialize;
 pub struct HeaderV1 {
     pub uuid: Uuid,
     #[serde(default)]
-    pub message_type: u32,
-    #[serde(default)]
     pub message_length: u32,
     #[serde(default)]
     pub sender_id: String,
@@ -30,9 +28,6 @@ impl HeaderV1 {
 
         // Serialize uuid (16 bytes)
         buffer.write_all(self.uuid.as_bytes()).unwrap();
-
-        // Serialize message_type (4 bytes)
-        buffer.write_all(&self.message_type.to_le_bytes()).unwrap();
 
         // Serialize message_length (4 bytes)
         buffer.write_all(&self.message_length.to_le_bytes()).unwrap();
@@ -67,11 +62,6 @@ impl HeaderV1 {
         let mut uuid_bytes = [0u8; 16];
         cursor.read_exact(&mut uuid_bytes).ok()?;
         let uuid = Uuid::from_bytes(uuid_bytes);
-
-        // Deserialize message_type
-        let mut message_type_bytes = [0u8; 4];
-        cursor.read_exact(&mut message_type_bytes).ok()?;
-        let message_type = u32::from_le_bytes(message_type_bytes);
 
         // Deserialize message_length
         let mut message_length_bytes = [0u8; 4];
@@ -112,7 +102,6 @@ impl HeaderV1 {
 
         Some(Self {
             uuid,
-            message_type,
             message_length,
             sender_id,
             tracker_id,
@@ -127,8 +116,8 @@ impl HeaderV1 {
 
     pub fn to_json_string(&self) -> String {
         format!(
-            r#"{{"uuid": "{}", "message_type": {}, "message_length": {}, "sender_id": "{}", "tracker_id": "{}", "verification_data": "{}"}}"#,
-            self.uuid, self.message_type, self.message_length, self.sender_id, self.tracker_id, self.verification_data
+            r#"{{"uuid": "{}", "message_length": {}, "sender_id": "{}", "tracker_id": "{}", "verification_data": "{}"}}"#,
+            self.uuid, self.message_length, self.sender_id, self.tracker_id, self.verification_data
         )
     }
 
@@ -149,7 +138,6 @@ mod tests {
     fn test_serialize_and_deserialize() {
         let header = HeaderV1 {
             uuid: Uuid::new_v4(),
-            message_type: 1,
             message_length: 42,
             sender_id: "sender_1".to_string(),
             tracker_id: "tracker_1".to_string(),
@@ -162,7 +150,6 @@ mod tests {
         let deserialized = HeaderV1::deserialize(&mut cursor).unwrap();
 
         assert_eq!(header.uuid, deserialized.uuid);
-        assert_eq!(header.message_type, deserialized.message_type);
         assert_eq!(header.message_length, deserialized.message_length);
         assert_eq!(header.sender_id, deserialized.sender_id);
         assert_eq!(header.compression, deserialized.compression); // New line for compression check
@@ -172,7 +159,6 @@ mod tests {
     fn test_from_json_string() {
         let json_str = r#"{
             "uuid": "550e8400-e29b-41d4-a716-446655440000",
-            "message_type": 1,
             "message_length": 42,
             "sender_id": "127.0.0.1",
             "compression": "Gzip"
@@ -180,7 +166,6 @@ mod tests {
 
         let header = HeaderV1::from_json_string(json_str).unwrap();
         assert_eq!(header.uuid, Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap());
-        assert_eq!(header.message_type, 1);
         assert_eq!(header.message_length, 42);
         assert_eq!(header.sender_id, "127.0.0.1");
         assert_eq!(header.compression, Compression::Gzip);
@@ -190,7 +175,6 @@ mod tests {
     fn test_to_json_string() {
         let header = HeaderV1 {
             uuid: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
-            message_type: 1,
             message_length: 42,
             sender_id: "sender_1".to_string(),
             tracker_id: "tracker_1".to_string(),
@@ -201,7 +185,7 @@ mod tests {
         let json_str = header.to_json_string();
         assert_eq!(
             json_str,
-            r#"{"uuid": "550e8400-e29b-41d4-a716-446655440000", "message_type": 1, "message_length": 42, "sender_id": "sender_1", "tracker_id": "tracker_1", "verification_data": "verification_data_1"}"#
+            r#"{"uuid": "550e8400-e29b-41d4-a716-446655440000", "message_length": 42, "sender_id": "sender_1", "tracker_id": "tracker_1", "verification_data": "verification_data_1"}"#
         );
     }
 }

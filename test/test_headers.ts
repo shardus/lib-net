@@ -6,8 +6,11 @@ const setupSender = (port: number, senderOpts: any, headerOpts: any) => {
     address: '127.0.0.1',
     senderOpts,
     headerOpts,
-    signingSecretKeyHex:
-      'c3774b92cc8850fb4026b073081290b82cab3c0f66cac250b4d710ee9aaf83ed8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d',
+    crypto: {
+      signingSecretKeyHex:
+        'c3774b92cc8850fb4026b073081290b82cab3c0f66cac250b4d710ee9aaf83ed8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d',
+      hashKey: '69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc',
+    },
   })
 }
 
@@ -50,14 +53,13 @@ const testWhenBothServersSupportHeader = async (): Promise<string> => {
     return respond({ message: 'pong', fromPort: 44445 })
   })
 
-  sn1.send(
+  sn1.sendWithHeader(
     44445,
     '127.0.0.1',
     { message: 'ping', fromPort: 44444 },
-    // {
-    //   message_type: 1,
-    //   sender_id: '0xabc',
-    // },
+    {
+      sender_id: '0xabc',
+    },
     1000
   )
 

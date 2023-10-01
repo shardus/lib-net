@@ -92,7 +92,6 @@ export type TimeoutCallback = () => void
 export type ListenCallback = (data: unknown, remote: RemoteSender, respond: ResponseCallback) => void
 
 export interface AppHeader {
-  message_type?: number
   sender_id?: string
   tracker_id?: string
   verification_data?: string
@@ -101,7 +100,6 @@ export interface AppHeader {
 
 export interface CombinedHeader {
   uuid: string
-  message_type?: number
   sender_id?: string
   tracker_id?: string
   verification_data?: string

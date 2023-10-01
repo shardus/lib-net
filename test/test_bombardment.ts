@@ -28,8 +28,11 @@ function setupSocketClients() {
     socketClients.push(
       Sn({
         port,
-        signingSecretKeyHex:
-          'c3774b92cc8850fb4026b073081290b82cab3c0f66cac250b4d710ee9aaf83ed8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d',
+        crypto: {
+          signingSecretKeyHex:
+            'c3774b92cc8850fb4026b073081290b82cab3c0f66cac250b4d710ee9aaf83ed8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d',
+          hashKey: '69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc',
+        },
       })
     )
   }
@@ -48,10 +51,10 @@ async function socketBombardment() {
   setupSocketClients()
   await delay(3000)
 
-  for (let i = 0; i < NUMBER_OF_BOMBS || NUMBER_OF_BOMBS === -1; i++) {
+  for (let i = 0; i < NUMBER_OF_BOMBS; i++) {
     const promises: Promise<void>[] = []
     const baseSocketClients = Math.floor(NUMBER_OF_SOCKET_CLIENTS / RAMP_UP_EVERY_X_BOMBS)
-    console.log(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS === -1 ? 'infinite' : NUMBER_OF_BOMBS}`)
+    console.log(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS}`)
     let socketClientsToUse = NUMBER_OF_SOCKET_CLIENTS
     if (RAMP_UP_STRATEGY === 'linear' && i % RAMP_UP_EVERY_X_BOMBS === 0) {
       console.log(
@@ -80,9 +83,9 @@ async function socketBombardmentWithLimitedActiveSockets(numberOfActiveSockets: 
   setupSocketClients()
   await delay(3000)
 
-  for (let i = 0; i < NUMBER_OF_BOMBS || NUMBER_OF_BOMBS === -1; i++) {
+  for (let i = 0; i < NUMBER_OF_BOMBS; i++) {
     const promises: (() => Promise<void>)[] = []
-    console.log(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS === -1 ? 'infinite' : NUMBER_OF_BOMBS}`)
+    console.log(`Bombardment ${i + 1} of ${NUMBER_OF_BOMBS}`)
     let socketClientsToUse = NUMBER_OF_SOCKET_CLIENTS
     if (i != 0) socketClientsToUse = numberOfActiveSockets
     for (let j = 0; j < socketClientsToUse; j++) {

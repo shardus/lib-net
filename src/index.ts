@@ -172,8 +172,10 @@ export const Sn = (opts: SnOpts) => {
 
     const combinedHeader: CombinedHeader = {
       uuid: UUID,
-      message_type: header.message_type,
       sender_id: header.sender_id,
+      tracker_id: header.tracker_id,
+      verification_data: header.verification_data,
+      compression: header.compression,
     }
 
     return _sendAug(port, address, augData, timeout, onResponse, onTimeout, {
@@ -257,7 +259,6 @@ export const Sn = (opts: SnOpts) => {
           uuid: UUID,
         }
         if (header) {
-          combinedHeader.message_type = header.message_type
           combinedHeader.sender_id = header.sender_id
           combinedHeader.tracker_id = header.tracker_id
           combinedHeader.verification_data = header.verification_data
