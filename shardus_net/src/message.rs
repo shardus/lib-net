@@ -175,7 +175,8 @@ mod tests {
             sig: vec![0x9a, 0xbc, 0xde, 0xf0],
         };
 
-        let expected_json_string = "{\"owner\": \"12345678\", \"signature\": \"9abcdef0\"}";
+        let expected_json_string = "{\"owner\": \"12345678\", \"sig\": \"9abcdef0\"}";
+
         assert_eq!(sign.to_json_string(), expected_json_string);
     }
 }
