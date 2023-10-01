@@ -136,7 +136,9 @@ impl ShardusCrypto {
             HexStringOrBuffer::Buffer(buf) => buf.clone(),
         };
 
-        let opened = sodiumoxide::crypto::sign::verify(&sig.as_slice(), pk);
+        let decoded_buf_sig = sodiumoxide::hex::decode(sig).expect("Invalid hex format for signature");
+
+        let opened = sodiumoxide::crypto::sign::verify(&decoded_buf_sig.as_slice(), pk);
 
         match opened {
             Ok(opened_msg) => opened_msg == msg_buf,
@@ -214,7 +216,11 @@ mod tests {
 
         let some_hex_string = "1234567890abcdef".to_string();
 
-        let result = sc.verify(&HexStringOrBuffer::Hex(some_hex_string), &nodejs_signed_sig.as_bytes().to_vec(), &pk);
+        let result = sc.verify(
+            &HexStringOrBuffer::Hex(some_hex_string), 
+            &nodejs_signed_sig.as_bytes().to_vec(), 
+            &pk
+        );
 
         assert_eq!(true, result);
     }
