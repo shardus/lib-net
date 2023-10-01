@@ -47,7 +47,6 @@ export const NewAugData = (
 export type SnOpts = {
   port: number
   address?: string
-  signingSecretKeyHex: string
   senderOpts?: {
     useLruCache?: boolean
     lruSize: number
@@ -56,6 +55,10 @@ export type SnOpts = {
     sendHeaderVersion: number
   }
   customStringifier?: (val) => string
+  crypto: {
+    hashKey: string
+    signingSecretKeyHex: string
+  }
 }
 
 /**
@@ -67,6 +70,8 @@ export const validateSnOpts = (opts: SnOpts) => {
   if (!opts) throw new Error('snq: must supply options')
 
   if (!opts.port || typeof opts.port !== 'number') throw new Error('snq: must supply port')
+
+  if (!opts.crypto.hashKey || typeof opts.crypto.hashKey !== 'string') throw new Error('snq: must supply hashKey')
 
   if (opts.senderOpts && opts.senderOpts.useLruCache && !opts.senderOpts.lruSize)
     throw new Error('snq: must supply lruSize when using lruCache')
