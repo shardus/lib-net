@@ -80,11 +80,7 @@ const testWhenReceiverSupportHeader = async (): Promise<string> => {
     }
   })
 
-  const sn2 = setupSender(
-    44447,
-    { useLruCache: true, lruSize: 2 },
-    { sendHeaderVersion: 1 }
-  )
+  const sn2 = setupSender(44447, { useLruCache: true, lruSize: 2 }, { sendHeaderVersion: 1 })
   sn2.listen((data: any, remote, respond, header) => {
     console.log('Received message on 44445:', data)
     if (data && data.message === 'ping') {
@@ -105,11 +101,7 @@ const testWhenSenderSupportHeader = async (): Promise<string> => {
   let testResult = 'failed'
 
   // setup test servers
-  const sn1 = setupSender(
-    44448,
-    { useLruCache: true, lruSize: 2 },
-    {sendHeaderVersion: 1 }
-  )
+  const sn1 = setupSender(44448, { useLruCache: true, lruSize: 2 }, { sendHeaderVersion: 1 })
 
   sn1.listen((data: any, remote, respond, header) => {
     console.log('Received message on 44444:', data)

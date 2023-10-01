@@ -71,7 +71,8 @@ export const validateSnOpts = (opts: SnOpts) => {
 
   if (!opts.port || typeof opts.port !== 'number') throw new Error('snq: must supply port')
 
-  if (!opts.crypto.hashKey || typeof opts.crypto.hashKey !== 'string') throw new Error('snq: must supply hashKey')
+  if (!opts.crypto.hashKey || typeof opts.crypto.hashKey !== 'string')
+    throw new Error('snq: must supply hashKey')
 
   if (opts.senderOpts && opts.senderOpts.useLruCache && !opts.senderOpts.lruSize)
     throw new Error('snq: must supply lruSize when using lruCache')
