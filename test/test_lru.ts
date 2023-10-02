@@ -1,5 +1,6 @@
-import { Sn } from '../.'
 import { Command } from 'commander'
+import { Sn } from '../.'
+import { AppHeader, Sign } from '../build/src/types'
 
 const setupLruSender = (port: number, lruSize: number) => {
   return Sn({
@@ -59,7 +60,13 @@ const main = async () => {
         {
           sender_id: 'test',
         },
-        1000
+        1000,
+        (data: unknown, header?: AppHeader) => {
+          console.log('onResp: Received response:', JSON.stringify(data, null, 2))
+          if (header) {
+            console.log('onResp: Received header:', JSON.stringify(header, null, 2))
+          }
+        }
       )
       console.log('Message sent')
     } else if (inputs.length === 2) {

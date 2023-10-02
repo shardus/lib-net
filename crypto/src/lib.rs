@@ -222,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sign_verify_encoderless_buffer(){
+    fn test_sign_verify_encoderless_buffer() {
         let sc = ShardusCrypto::new("64f152869ca2d473e4ba64ab53f49ccdb2edae22da192c126850970e788af347");
         let pk = sodiumoxide::crypto::sign::PublicKey::from_slice(&sodiumoxide::hex::decode("8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d").unwrap()).expect("Invalid public key");
         let sk = sodiumoxide::crypto::sign::SecretKey::from_slice(

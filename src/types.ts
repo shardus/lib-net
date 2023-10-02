@@ -83,7 +83,7 @@ export interface RemoteSender {
   port: number | undefined
 }
 
-export type ResponseCallback = (data?: unknown) => void
+export type ResponseCallback = (data?: unknown, header?: AppHeader, sign?: Sign) => void
 
 export type ListenerResponder = (data?: unknown, header?: AppHeader) => void
 

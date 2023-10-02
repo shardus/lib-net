@@ -41,7 +41,7 @@ export const Sn = (opts: SnOpts) => {
   // we're going to keep track of response IDs here
   const responseUUIDMapping: {
     [uuid: string]: {
-      callback: (data: unknown) => void
+      callback: (data: unknown, header?: AppHeader, sign?: Sign) => void
       timestamp: number
     }
   } = {}
@@ -142,9 +142,9 @@ export const Sn = (opts: SnOpts) => {
         // later extractUUIDHandleData will call this callback if it
         // finds a UUID match.
         responseUUIDMapping[augData.UUID] = {
-          callback: (data: unknown) => {
+          callback: (data: unknown, appHeader?: AppHeader, sign?: Sign) => {
             clearTimeout(timer)
-            onResponse(data)
+            onResponse(data, appHeader, sign)
           },
           timestamp: Date.now(),
         }
@@ -275,14 +275,17 @@ export const Sn = (opts: SnOpts) => {
 
       // If we are expecting a response, go through the respond mechanism.
       // Otherwise, it's a normal incoming message.
-      const handle = responseUUIDMapping[UUID] ? responseUUIDMapping[UUID].callback : handleData
-
-      if (responseUUIDMapping[UUID] !== undefined) {
+      if (responseUUIDMapping[UUID]) {
         /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message found in responseUUIDMapping`)
         /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time taken for operation ${Date.now() - responseUUIDMapping[UUID].timestamp}ms`)
         histogram.logData((Date.now() - responseUUIDMapping[UUID].timestamp) / 1000)
+
+        const handle = responseUUIDMapping[UUID].callback
+        // Clear the respond mechanism.
+        delete responseUUIDMapping[UUID]
+        return handle(data, header, sign)
       } else {
-        /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message not found in responseUUIDMapping`)
+        // check if the UUID is in the timedOutUUIDMapping
         const entry = timedOutUUIDMapping.get(UUID)
         if (entry != undefined) {
           /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message was found in timedOutUUIDMapping, timed out at ${entry.timedOutAt}, request created at ${entry.requestCreatedAt}, response received at ${Date.now()}`)
@@ -290,12 +293,9 @@ export const Sn = (opts: SnOpts) => {
           histogram.logData((Date.now() - entry.requestCreatedAt) / 1000)
           timedOutUUIDMapping.delete(UUID)
         }
+
+        return handleData(data, remote, respond, header, sign)
       }
-
-      // Clear the respond mechanism.
-      delete responseUUIDMapping[UUID]
-
-      return handle(data, remote, respond, header, sign)
     }
 
     // OLD comment from initial implementation:
@@ -346,7 +346,7 @@ export const Sn = (opts: SnOpts) => {
 
   const returnVal = {
     send,
-    sendWithHeader: sendWithHeader,
+    sendWithHeader,
     listen,
     stopListening,
     stats,
