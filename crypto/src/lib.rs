@@ -220,4 +220,20 @@ mod tests {
 
         assert_eq!(true, result);
     }
+
+    #[test]
+    fn test_sign_verify_encoderless_buffer(){
+        let sc = ShardusCrypto::new("64f152869ca2d473e4ba64ab53f49ccdb2edae22da192c126850970e788af347");
+        let pk = sodiumoxide::crypto::sign::PublicKey::from_slice(&sodiumoxide::hex::decode("8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d").unwrap()).expect("Invalid public key");
+        let sk = sodiumoxide::crypto::sign::SecretKey::from_slice(
+            &sodiumoxide::hex::decode("c3774b92cc8850fb4026b073081290b82cab3c0f66cac250b4d710ee9aaf83ed8088b37f6f458104515ae18c2a05bde890199322f62ab5114d20c77bde5e6c9d").unwrap(),
+        )
+        .expect("Invalid secret key");
+
+        let some_message = "hello world".as_bytes().to_vec();
+        let sig = sc.sign(HexStringOrBuffer::Buffer(some_message.clone()), &sk).expect("Couldn't sign buffer");
+        let result = sc.verify(&HexStringOrBuffer::Buffer(some_message.clone()), &sig, &pk);
+
+        assert_eq!(true, result);
+    }
 }
