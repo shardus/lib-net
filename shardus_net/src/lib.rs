@@ -21,8 +21,8 @@ mod shardus_net_sender;
 mod stats;
 
 pub mod compression;
-mod header_factory;
 pub mod header;
+mod header_factory;
 
 use ring_buffer::Stats as RingBufferStats;
 use runtime::RUNTIME;
@@ -407,11 +407,25 @@ fn to_stats_object<'a>(cx: &mut impl Context<'a>, long_term_max: f64, long_term_
     Ok(obj)
 }
 
+fn set_logging_enabled(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let enabled = cx.argument::<JsBoolean>(0)?.value(&mut cx);
+
+    if enabled {
+        log::set_max_level(log::LevelFilter::Info);
+    } else {
+        log::set_max_level(log::LevelFilter::Off);
+    }
+
+    Ok(cx.undefined())
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
 
     cx.export_function("Sn", create_shardus_net)?;
+
+    cx.export_function("setLoggingEnabled", set_logging_enabled)?;
 
     Ok(())
 }

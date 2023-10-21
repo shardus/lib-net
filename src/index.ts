@@ -27,6 +27,7 @@ const verbose_logs = false
 export let logFlags = {
   net_verbose: false,
   net_stats: false,
+  net_rust: false,
 }
 
 const noop = () => {}
@@ -46,6 +47,8 @@ export const Sn = (opts: SnOpts) => {
   }
 
   const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE, HASH_KEY, SIGNING_SECRET_KEY_HEX)
+
+  net.setLogFlags(false)
 
   // we're going to keep track of response IDs here
   const responseUUIDMapping: {
@@ -369,6 +372,7 @@ export const Sn = (opts: SnOpts) => {
       logFlags = {
         net_verbose: false,
         net_stats: false,
+        net_rust: false,
       }
     }
 
@@ -380,6 +384,9 @@ export const Sn = (opts: SnOpts) => {
     //make sure values are set if missing
     logFlags.net_stats ??= false
     logFlags.net_verbose ??= false
+    logFlags.net_rust ??= false
+
+    net.setLogFlags(logFlags.net_rust)
   }
 
   const returnVal = {
