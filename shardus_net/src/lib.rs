@@ -415,7 +415,16 @@ fn set_logging_enabled(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     } else {
         log::set_max_level(log::LevelFilter::Off);
     }
-
+    //not sure if this is needed:
+    if enabled {
+        //SimpleLogger::init_with_level(LevelFilter::Info).unwrap();
+        //SimpleLogger::set_level(LevelFilter::Info);
+        SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
+    } else {
+        //SimpleLogger::init_with_level(LevelFilter::Off).unwrap();
+        //SimpleLogger::set_level(LevelFilter::Off);
+        SimpleLogger::init(LevelFilter::Off, Config::default()).unwrap();
+    }
     Ok(cx.undefined())
 }
 

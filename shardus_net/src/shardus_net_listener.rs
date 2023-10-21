@@ -1,5 +1,5 @@
-use crate::header_factory::header_deserialize_factory;
 use crate::header::header_types::RequestMetadata;
+use crate::header_factory::header_deserialize_factory;
 use crate::message::Message;
 use crate::shardus_crypto;
 
@@ -117,7 +117,7 @@ impl ShardusNetListener {
                     error!("Failed to verify message signature");
                     continue;
                 }
-                println!("Message verified!");
+                info!("Message verified!");
 
                 let header_cursor = &mut Cursor::new(message.header);
                 let header = header_deserialize_factory(message.header_version, header_cursor).expect("Failed to deserialize header");
@@ -139,7 +139,7 @@ impl ShardusNetListener {
 
                 // deserialize remaining bytes as your message
                 let msg = String::from_utf8(decompressed_data_bytes.to_vec())?;
-                println!("Received message: {}", msg);
+                info!("Received message: {}", msg);
                 received_msg_tx.send((msg, remote_addr, Some(request_metadata))).map_err(|_| SendError(()))?;
             } else {
                 // No header present
