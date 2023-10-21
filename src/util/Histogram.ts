@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { logFlags } from '..'
 
 export class Histogram<T> {
   private buckets: Map<string, number>
@@ -53,8 +54,8 @@ export const NewNumberHistogram = (name: string, bucketRanges: number[]) => {
   })
 
   setInterval(() => {
-    histogram.printHistogram(name)
-    histogram.clearHistogram()
+    /* prettier-ignore */ if(logFlags.net_stats) histogram.printHistogram(name)
+    /* prettier-ignore */ if(logFlags.net_stats) histogram.clearHistogram()
   }, 10 * 60 * 1000)
 
   return histogram

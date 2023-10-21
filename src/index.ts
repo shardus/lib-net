@@ -23,6 +23,12 @@ const DEFAULT_ADDRESS = '0.0.0.0'
 //todo make this a dynamic config or connect to shardus core log levels
 const verbose_logs = false
 
+//use these to control logging
+export let logFlags = {
+  net_verbose: false,
+  net_stats: false,
+}
+
 const noop = () => {}
 
 export const Sn = (opts: SnOpts) => {
@@ -89,7 +95,7 @@ export const Sn = (opts: SnOpts) => {
       ? stringifyData(optionalHeader.headerData, opts.customStringifier)
       : null
 
-    /* prettier-ignore */ if(verbose_logs) logMessageInfo(augData, stringifiedData)
+    /* prettier-ignore */ if(logFlags.net_verbose) logMessageInfo(augData, stringifiedData)
 
     return new Promise<void>((resolve, reject) => {
       const sendCallback = (error) => {
@@ -100,7 +106,7 @@ export const Sn = (opts: SnOpts) => {
         }
       }
       if (optionalHeader && stringifiedHeader !== null) {
-        /* prettier-ignore */ if(verbose_logs) console.log('sending with header')
+        /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
         _net.send_with_header(
           port,
           address,
@@ -110,7 +116,7 @@ export const Sn = (opts: SnOpts) => {
           sendCallback
         )
       } else {
-        /* prettier-ignore */ if(verbose_logs) console.log('sending without header')
+        /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
         _net.send(port, address, stringifiedData, sendCallback)
       }
 
@@ -126,12 +132,12 @@ export const Sn = (opts: SnOpts) => {
             },
             retainTimedOutEntriesForMillis,
             (key, value) => {
-              /* prettier-ignore */ if(verbose_logs) console.log(`_sendAug: request id ${key}: expired from timedOutUUIDMapping at ${value.timedOutAt}, request created at ${value.requestCreatedAt}}`)
-              /* prettier-ignore */ if(verbose_logs) histogram.logData((Date.now() - value.requestCreatedAt) / 1000)
+              /* prettier-ignore */ if(logFlags.net_verbose) console.log(`_sendAug: request id ${key}: expired from timedOutUUIDMapping at ${value.timedOutAt}, request created at ${value.requestCreatedAt}}`)
+              /* prettier-ignore */ if(logFlags.net_verbose) histogram.logData((Date.now() - value.requestCreatedAt) / 1000)
             }
           )
-          /* prettier-ignore */ if(verbose_logs) console.log(`_sendAug: request id ${augData.UUID}: timed out after ${Date.now() - mapping.timestamp}ms`)
-          /* prettier-ignore */ if(verbose_logs) console.log(`_sendAug: request id ${augData.UUID}: detailed aug data: ${JSON.stringify(augData)}`)
+          /* prettier-ignore */ if(logFlags.net_verbose) console.log(`_sendAug: request id ${augData.UUID}: timed out after ${Date.now() - mapping.timestamp}ms`)
+          /* prettier-ignore */ if(logFlags.net_verbose) console.log(`_sendAug: request id ${augData.UUID}: detailed aug data: ${JSON.stringify(augData)}`)
 
           //should we clear the request socket here?
           //should be be logging better at this level
@@ -231,7 +237,7 @@ export const Sn = (opts: SnOpts) => {
       //here we will log the received message.  note we exploit an aspect of augData
       //that the data part is the first value and will be close enough to the start ot the string
       //to save us from an expensive re-stringify just to get log data of the message
-      if (verbose_logs) logMessageInfo(augData, augDataStr, false, Date.now())
+      /* prettier-ignore */ if(logFlags.net_verbose) logMessageInfo(augData, augDataStr, false, Date.now())
 
       const { PORT, UUID, data } = augData
       const address = remote.address
@@ -243,7 +249,7 @@ export const Sn = (opts: SnOpts) => {
         //we can do some timestamp work here for better logging.
         const replyTime = Date.now()
         if (replyTime > augData.sendTime + augData.timeout) {
-          /* prettier-ignore */ console.log(`listen: extractUUIDHandleData: request id ${UUID}: reply time ${replyTime} is greater than timeout ${augData.sendTime + augData.timeout}. ignoring respond call`)
+          /* prettier-ignore */ if(logFlags.net_verbose) console.log(`listen: extractUUIDHandleData: request id ${UUID}: reply time ${replyTime} is greater than timeout ${augData.sendTime + augData.timeout}. ignoring respond call`)
           return
         }
         const sendData = {
@@ -279,9 +285,9 @@ export const Sn = (opts: SnOpts) => {
       // If we are expecting a response, go through the respond mechanism.
       // Otherwise, it's a normal incoming message.
       if (responseUUIDMapping[UUID]) {
-        /* prettier-ignore */ if(verbose_logs) console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message found in responseUUIDMapping`)
-        /* prettier-ignore */ if(verbose_logs) console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time taken for operation ${Date.now() - responseUUIDMapping[UUID].timestamp}ms`)
-        /* prettier-ignore */ if(verbose_logs) histogram.logData((Date.now() - responseUUIDMapping[UUID].timestamp) / 1000)
+        /* prettier-ignore */ if(logFlags.net_verbose) console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message found in responseUUIDMapping`)
+        /* prettier-ignore */ if(logFlags.net_verbose) console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time taken for operation ${Date.now() - responseUUIDMapping[UUID].timestamp}ms`)
+        /* prettier-ignore */ if(logFlags.net_stats) histogram.logData((Date.now() - responseUUIDMapping[UUID].timestamp) / 1000)
 
         const handle = responseUUIDMapping[UUID].callback
         // Clear the respond mechanism.
@@ -291,9 +297,9 @@ export const Sn = (opts: SnOpts) => {
         // check if the UUID is in the timedOutUUIDMapping
         const entry = timedOutUUIDMapping.get(UUID)
         if (entry != undefined) {
-          /* prettier-ignore */ if(verbose_logs) console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message was found in timedOutUUIDMapping, timed out at ${entry.timedOutAt}, request created at ${entry.requestCreatedAt}, response received at ${Date.now()}`)
-          /* prettier-ignore */ if(verbose_logs) console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time taken for operation ${Date.now() - entry.requestCreatedAt}ms`)
-          /* prettier-ignore */ if(verbose_logs) histogram.logData((Date.now() - entry.requestCreatedAt) / 1000)
+          /* prettier-ignore */ if(logFlags.net_verbose) console.log(`listen: extractUUIDHandleData: request id ${UUID}: incoming message was found in timedOutUUIDMapping, timed out at ${entry.timedOutAt}, request created at ${entry.requestCreatedAt}, response received at ${Date.now()}`)
+          /* prettier-ignore */ if(logFlags.net_verbose) console.log(`listen: extractUUIDHandleData: request id ${UUID}: actual time taken for operation ${Date.now() - entry.requestCreatedAt}ms`)
+          /* prettier-ignore */ if(logFlags.net_stats) histogram.logData((Date.now() - entry.requestCreatedAt) / 1000)
           timedOutUUIDMapping.delete(UUID)
         }
 
@@ -307,10 +313,10 @@ export const Sn = (opts: SnOpts) => {
     // const server = await _net.listen(PORT, ADDRESS, extractUUIDHandleData)
     const server = await _net.listen((data, remoteIp, remotePort, headerVersion?, headerData?, signData?) => {
       if (headerVersion && headerData && signData) {
-        if (verbose_logs) console.log(`received with header version: ${headerVersion}`)
+        /* prettier-ignore */ if(logFlags.net_verbose) console.log(`received with header version: ${headerVersion}`)
         const header: AppHeader = JSON.parse(headerData)
-        if (verbose_logs) console.log(`received with header: ${JSON.stringify(header)}`)
-        if (verbose_logs) console.log(`received with sign: ${signData}`)
+        /* prettier-ignore */ if(logFlags.net_verbose) console.log(`received with header: ${JSON.stringify(header)}`)
+        /* prettier-ignore */ if(logFlags.net_verbose) console.log(`received with sign: ${signData}`)
         const sign: Sign = JSON.parse(signData)
         extractUUIDHandleData(
           data,
@@ -347,6 +353,35 @@ export const Sn = (opts: SnOpts) => {
 
   const stats = () => _net.stats()
 
+  /**
+   * This allows shardus core to set log flags for shardus net
+   * If you use any additional flags they need to be added here
+   * to guarantee they are set
+   * @param setLogFlags
+   */
+  //@ts-ignore
+  const setLogFlags = (setLogFlags: any) => {
+    if (setLogFlags == null) {
+      return
+    }
+
+    if (logFlags == null) {
+      logFlags = {
+        net_verbose: false,
+        net_stats: false,
+      }
+    }
+
+    //loop through and set flags
+    for (const [key, value] of Object.entries(setLogFlags)) {
+      logFlags[key] = value
+    }
+
+    //make sure values are set if missing
+    logFlags.net_stats ??= false
+    logFlags.net_verbose ??= false
+  }
+
   const returnVal = {
     send,
     sendWithHeader,
@@ -355,6 +390,7 @@ export const Sn = (opts: SnOpts) => {
     stats,
     evictSocket,
     updateHeaderOpts,
+    setLogFlags,
   }
 
   return returnVal
