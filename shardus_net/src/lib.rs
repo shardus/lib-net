@@ -8,7 +8,7 @@ use std::{net::ToSocketAddrs, sync::Arc};
 
 use header_factory::header_from_json_string;
 use log::info;
-use log::LevelFilter;
+//use log::LevelFilter;
 use lru::LruCache;
 use neon::{prelude::*, result::Throw};
 
@@ -29,7 +29,7 @@ use runtime::RUNTIME;
 use shardus_net_listener::ShardusNetListener;
 use shardus_net_sender::ConnectionCache;
 use shardus_net_sender::{SendResult, ShardusNetSender};
-use simplelog::{Config, SimpleLogger};
+//use simplelog::{Config, SimpleLogger};
 use stats::{Incrementers, Stats, StatsResult};
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
@@ -416,21 +416,21 @@ fn set_logging_enabled(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         log::set_max_level(log::LevelFilter::Off);
     }
     //not sure if this is needed:
-    if enabled {
-        //SimpleLogger::init_with_level(LevelFilter::Info).unwrap();
-        //SimpleLogger::set_level(LevelFilter::Info);
-        SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
-    } else {
-        //SimpleLogger::init_with_level(LevelFilter::Off).unwrap();
-        //SimpleLogger::set_level(LevelFilter::Off);
-        SimpleLogger::init(LevelFilter::Off, Config::default()).unwrap();
-    }
+    // if enabled {
+    //     //SimpleLogger::init_with_level(LevelFilter::Info).unwrap();
+    //     //SimpleLogger::set_level(LevelFilter::Info);
+    //     SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
+    // } else {
+    //     //SimpleLogger::init_with_level(LevelFilter::Off).unwrap();
+    //     //SimpleLogger::set_level(LevelFilter::Off);
+    //     SimpleLogger::init(LevelFilter::Off, Config::default()).unwrap();
+    // }
     Ok(cx.undefined())
 }
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
+    //SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
 
     cx.export_function("Sn", create_shardus_net)?;
 
