@@ -1,6 +1,6 @@
 use super::runtime::RUNTIME;
-use crate::header_factory::{header_serialize_factory, wrap_serialized_message};
 use crate::header::header_types::Header;
+use crate::header_factory::{header_serialize_factory, wrap_serialized_message};
 use crate::message::Message;
 use crate::oneshot::Sender;
 use crate::shardus_crypto;
@@ -84,10 +84,10 @@ impl ShardusNetSender {
             while let Some(address) = evict_socket_channel_rx.recv().await {
                 let mut connections = connections.lock().await;
                 connections.remove(&address);
-                info!("Evicted socket {} from cache", address);
+                // info!("Evicted socket {} from cache", address);
             }
 
-            info!("Evictor channel complete. Shutting down evictor task.")
+            // info!("Evictor channel complete. Shutting down evictor task.")
         });
     }
 
@@ -107,7 +107,7 @@ impl ShardusNetSender {
                 });
             }
 
-            info!("Sending channel complete. Shutting down sending task.")
+            // info!("Sending channel complete. Shutting down sending task.")
         });
     }
 }
@@ -133,7 +133,7 @@ impl Connection {
         let result = Self::write_data_to_stream(socket, data.clone()).await;
 
         if result.is_err() {
-            info!("Failed to send data to {}. Attempting to reconnect and try again.", self.address);
+            // info!("Failed to send data to {}. Attempting to reconnect and try again.", self.address);
 
             // There was an error sending data. The connection might have been previously closed.
             *socket_op = None;
@@ -202,7 +202,7 @@ impl ConnectionCache for HashMap<SocketAddr, Arc<Connection>> {
 
 impl ConnectionCache for LruCache<SocketAddr, Arc<Connection>> {
     fn get_or_insert(&mut self, address: SocketAddr) -> Arc<Connection> {
-        info!("LruCache stats, current_size: {}, capacity: {}", self.len(), self.cap());
+        // info!("LruCache stats, current_size: {}, capacity: {}", self.len(), self.cap());
         match self.get(&address) {
             Some(connection) => connection.clone(),
             None => {

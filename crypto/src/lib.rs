@@ -157,7 +157,7 @@ mod tests {
 
         let result = sc.hash(&"hello world".to_string().into_bytes(), Format::Hex);
 
-        info!("Shardus-crypto compatibility Test: hash - result: {}", result.to_string());
+        // info!("Shardus-crypto compatibility Test: hash - result: {}", result.to_string());
 
         // this hashed comes from shardus-crypto-utils nodejs library with the same input string and hash key
         let expected = "463bad7a09d224af5251be7d979cc8db3df37c422ea38d6c3986c54ee9c8f116".to_string();
@@ -183,11 +183,11 @@ mod tests {
         // this signature came from shardus-crypto-utils nodejs library with the same inputs and same hash key
         let expected_sig = "cd1159381c39554a07309b0a0803a0cef4a85eb78685086f8ccbd06fe846bbd260bd8cd1ae9c4eff6af672be72c2a18d561793a301986276af999f2fd49477011234567890abcdef";
 
-        info!(
-            "Shardus-crypto compatibility Test: sign - result: buffer_fed_sig: {}, str_fed_sig: {}",
-            sodiumoxide::hex::encode(buffer_fed_sig.clone()),
-            sodiumoxide::hex::encode(str_fed_sig.clone())
-        );
+        // info!(
+        //     "Shardus-crypto compatibility Test: sign - result: buffer_fed_sig: {}, str_fed_sig: {}",
+        //     sodiumoxide::hex::encode(buffer_fed_sig.clone()),
+        //     sodiumoxide::hex::encode(str_fed_sig.clone())
+        // );
 
         assert_eq!(
             expected_sig.to_string(),
@@ -212,7 +212,7 @@ mod tests {
 
         // this signature came from shardus-crypto-utils nodejs library with the same inputs and same hash key
         let nodejs_signed_sig = "cd1159381c39554a07309b0a0803a0cef4a85eb78685086f8ccbd06fe846bbd260bd8cd1ae9c4eff6af672be72c2a18d561793a301986276af999f2fd49477011234567890abcdef".to_string();
-        info!("Shardus-crypto compatibility Test: verify - result: {}", HexStringOrBuffer::Hex(nodejs_signed_sig.clone()));
+        // info!("Shardus-crypto compatibility Test: verify - result: {}", HexStringOrBuffer::Hex(nodejs_signed_sig.clone()));
 
         let some_hex_string = "1234567890abcdef".to_string();
 

@@ -48,7 +48,7 @@ export const Sn = (opts: SnOpts) => {
 
   const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE, HASH_KEY, SIGNING_SECRET_KEY_HEX)
 
-  net.setLoggingEnabled(false)
+  // net.setLoggingEnabled(false)
 
   // we're going to keep track of response IDs here
   const responseUUIDMapping: {
@@ -386,7 +386,7 @@ export const Sn = (opts: SnOpts) => {
     logFlags.net_verbose ??= false
     logFlags.net_rust ??= false
 
-    net.setLoggingEnabled(logFlags.net_rust)
+    // net.setLoggingEnabled(logFlags.net_rust)
   }
 
   const returnVal = {

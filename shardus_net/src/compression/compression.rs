@@ -37,12 +37,12 @@ impl Compression {
         match *self {
             Compression::None => data.to_vec(),
             Compression::Gzip => {
-                info!("Compressing data with Gzip");
+                // info!("Compressing data with Gzip");
                 let e = GzEncoder::new(data, GzipCompression::default());
                 e.bytes().collect::<Result<Vec<u8>, _>>().unwrap()
             }
             Compression::Brotli => {
-                info!("Compressing data with Brotli");
+                // info!("Compressing data with Brotli");
                 let mut result = Vec::new();
                 let mut compressor = CompressorReader::new(data, 4096, 5, 22);
                 compressor.read_to_end(&mut result).unwrap();

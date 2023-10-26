@@ -117,7 +117,7 @@ impl ShardusNetListener {
                     error!("Failed to verify message signature");
                     continue;
                 }
-                info!("Message verified!");
+                // info!("Message verified!");
 
                 let header_cursor = &mut Cursor::new(message.header);
                 let header = header_deserialize_factory(message.header_version, header_cursor).expect("Failed to deserialize header");
@@ -139,7 +139,7 @@ impl ShardusNetListener {
 
                 // deserialize remaining bytes as your message
                 let msg = String::from_utf8(decompressed_data_bytes.to_vec())?;
-                info!("Received message: {}", msg);
+                // info!("Received message: {}", msg);
                 received_msg_tx.send((msg, remote_addr, Some(request_metadata))).map_err(|_| SendError(()))?;
             } else {
                 // No header present
