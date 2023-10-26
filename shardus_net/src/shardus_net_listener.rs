@@ -114,7 +114,7 @@ impl ShardusNetListener {
                 let message = Message::deserialize(&mut cursor).expect("Failed to deserialize message");
 
                 if message.verify(shardus_crypto::get_shardus_crypto_instance()) == false {
-                    error!("Failed to verify message signature");
+                    // error!("Failed to verify message signature");
                     continue;
                 }
                 // info!("Message verified!");
@@ -125,7 +125,7 @@ impl ShardusNetListener {
                 let data = message.data;
 
                 if header.validate(data.clone()) == false {
-                    error!("Failed to validate data with header");
+                    // error!("Failed to validate data with header");
                     continue;
                 }
 
