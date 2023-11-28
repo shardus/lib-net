@@ -10,10 +10,6 @@ stages:
   - build
   - appsec
 
-cache:
-  paths:
-    - node_modules/
-
 format-job:
   stage: build
   script:
@@ -23,6 +19,9 @@ format-job:
 
 # Build Job: Compiles the code
 build-job:
+  cache:
+    paths:
+      - node_modules/
   stage: build
   script:
     - echo "Compiling the code..."
