@@ -7,8 +7,17 @@ before_script:
   - node -v
 
 stages:
+  - prepare
   - build
   - appsec
+
+# Prepare job: Install Node.js dependencies
+prepare-job:
+  stage: prepare
+  script:
+    - node -v
+    - apt-get update
+    - npm ci  #install Node.js dependencies
 
 format-job:
   stage: build
@@ -25,7 +34,6 @@ build-job:
   stage: build
   script:
     - echo "Compiling the code..."
-    - npm install --silent
     - npm run compile
     - echo "Compile complete."
 
