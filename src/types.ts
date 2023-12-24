@@ -112,3 +112,5 @@ export interface Sign {
   owner: string
   sig: string
 }
+
+export type GetSenderAddressResults = { address: string, isValid: boolean }
