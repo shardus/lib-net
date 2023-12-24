@@ -3,6 +3,7 @@ import {
   AppHeader,
   AugmentedData,
   CombinedHeader,
+  GetSenderAddressResults,
   ListenerResponder,
   NewAugData,
   RemoteSender,
@@ -31,6 +32,16 @@ export let logFlags = {
 }
 
 const noop = () => {}
+
+export const getSenderAddress = (raw_tx: string): string => {
+  //trim the 0x if it is there
+  const raw_tx_trimmed = raw_tx.startsWith('0x') ? raw_tx.slice(2) : raw_tx
+  const { address, isValid } = net.getSenderAddress(raw_tx_trimmed) as GetSenderAddressResults
+  if(!isValid){
+    throw new Error('invalid signature')
+  }
+  return address
+}
 
 export const Sn = (opts: SnOpts) => {
   validateSnOpts(opts)

@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 crypto = { path = "../crypto" }
+ecrecover = { path = "../ecrecover" }
 tokio = { version = "1.13", features = [
   "io-util",
   "sync",

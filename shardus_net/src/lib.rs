@@ -428,6 +428,32 @@ fn set_logging_enabled(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
+fn get_sender_address_binded(mut cx: FunctionContext) -> JsResult<JsObject> {
+    let cx = &mut cx;
+    let raw_tx = cx.argument::<JsString>(0)?.value(cx);
+    let tx = ecrecover::get_transaction(&raw_tx);
+    let typedtx = ecrecover::get_typed_transaction(&raw_tx);
+
+    let sighash = typedtx.sighash();
+    let v = tx.v.as_u64();
+    let r = tx.r;
+    let s = tx.s;
+
+    let pubkey = ecrecover::ecrecover(sighash, v, r, s, tx.chain_id).unwrap();
+    let (addr, is_valid) = ecrecover::pub_to_addr(pubkey);
+
+    let result = cx.empty_object();
+    let js_addr = cx.string(format!("{:?}", addr));
+    let js_is_valid = cx.boolean(is_valid);
+    result.set(cx, "address", js_addr)?;
+    result.set(cx, "isValid", js_is_valid)?;
+
+    Ok(result)
+}
+
+
+
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     //SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
@@ -435,6 +461,8 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("Sn", create_shardus_net)?;
 
     cx.export_function("setLoggingEnabled", set_logging_enabled)?;
+    
+    cx.export_function("getSenderAddress", get_sender_address_binded)?;
 
     Ok(())
 }
