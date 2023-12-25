@@ -698,16 +698,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ecrecover"
-version = "0.1.0"
-dependencies = [
- "ethers",
- "hex",
- "secp256k1",
- "sha3",
-]
-
-[[package]]
 name = "ed25519"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2911,12 +2901,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "shardeum_utils"
+version = "0.1.0"
+dependencies = [
+ "ethers",
+ "hex",
+ "secp256k1",
+ "sha3",
+]
+
+[[package]]
 name = "shardus_net"
 version = "1.0.2"
 dependencies = [
  "brotli",
  "crypto",
- "ecrecover",
  "flate2",
  "log",
  "lru",
@@ -2925,6 +2924,7 @@ dependencies = [
  "owning_ref",
  "serde",
  "serde_json",
+ "shardeum_utils",
  "simplelog",
  "thiserror",
  "tokio",
