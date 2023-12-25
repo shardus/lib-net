@@ -432,19 +432,27 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
     let raw_tx = cx.argument::<JsString>(0)?.value(cx);
     let tx = shardeum_utils::get_transaction(&raw_tx);
-    let typed_tx = shardeum_utils::get_typed_transaction(&raw_tx);
+    let typed_tx = shardeum_utils::get_typed_transaction(&tx);
 
     let sighash = typed_tx.sighash();
     let v = tx.v.as_u64();
     let r = tx.r;
     let s = tx.s;
 
-    let pubkey = shardeum_utils::ecrecover(sighash, v, r, s, tx.chain_id).unwrap();
+    // None is for legacy transactions
+    // Some(1,2,3) is for post EIP-2718 transactions
+    // They hash things differently than legacy and chainid is integrated into v.
+    let pubkey = match tx.transaction_type {
+        Some(_) => shardeum_utils::ecrecover(sighash, v + 27, r, s, None).unwrap(),
+        None => shardeum_utils::ecrecover(sighash, v, r, s, tx.chain_id).unwrap()
+    };
+
     let (addr, is_valid) = shardeum_utils::pub_to_addr(pubkey);
 
     let result = cx.empty_object();
     let js_addr = cx.string(format!("{:?}", addr));
     let js_is_valid = cx.boolean(is_valid);
+
     result.set(cx, "address", js_addr)?;
     result.set(cx, "isValid", js_is_valid)?;
 
