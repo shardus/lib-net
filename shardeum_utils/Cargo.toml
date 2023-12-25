@@ -1,5 +1,5 @@
 [package]
-name = "ecrecover"
+name = "shardeum_utils"
 version = "0.1.0"
 edition = "2021"
 authors = ["Kaung Myatthu <kaung@shardus.com>"]
@@ -7,8 +7,6 @@ exclude = ["index.node"]
 
 [dependencies]
 secp256k1 = { version = "0.28.0", features = ["recovery", "global-context"] }
-sha3 = "0.10.8" 
+sha3 = "0.10.8"
 hex = "0.4.3"
 ethers = "2.0.0"
-
-

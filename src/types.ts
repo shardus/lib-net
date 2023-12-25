@@ -113,4 +113,4 @@ export interface Sign {
   sig: string
 }
 
-export type GetSenderAddressResults = { address: string, isValid: boolean }
+export type GetSenderAddressResult = { address: string; isValid: boolean }
