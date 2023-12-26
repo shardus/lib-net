@@ -15,7 +15,7 @@ pub fn ecrecover(sig_hash: H256, v: u64, r: U256, s: U256, chainid: Option<U256>
             None => v - 27,
         },
     };
-    
+
     if v_standard != 0 && v_standard != 1 {
         return Err(secp256k1::Error::InvalidRecoveryId);
     }
@@ -77,17 +77,16 @@ pub fn get_base_fee(tx: &ethers::types::transaction::eip2718::TypedTransaction) 
     // Calculate gas for the transaction data
     // 4 gas for every zero byte of data or 16 gas for non-zero byte of data
     // legacy transaction data gas fee is 0
-    let data_gas: U256 = tx.data().map(|data| {
-        data.0.iter().fold(U256::zero(), |acc, &byte| {
-            acc + if byte == 0 { U256::from(4) } else { U256::from(16) }
-        })
-    }).unwrap_or(U256::zero());
+    let data_gas: U256 = tx
+        .data()
+        .map(|data| data.0.iter().fold(U256::zero(), |acc, &byte| acc + if byte == 0 { U256::from(4) } else { U256::from(16) }))
+        .unwrap_or(U256::zero());
 
     // If the transaction is to a 'null' address (contract creation), add additional gas
     let creation_gas = match tx.to() {
         Some(to) if to.as_address().unwrap() == &Address::zero() => U256::from(32000),
         _ => U256::zero(),
-    }; 
+    };
 
     base_gas + data_gas + creation_gas
 }
@@ -114,7 +113,6 @@ mod tests {
         let typedtx: TypedTransaction = Into::into(&tx);
         let sighash = typedtx.sighash();
 
-
         let v = tx.v.as_u64();
         let r = tx.r;
         let s = tx.s;
@@ -136,23 +134,23 @@ mod tests {
 
         let typedtx: TypedTransaction = Into::into(&tx);
         let sighash = typedtx.sighash();
-    
+
         let v = tx.v.as_u64();
         let r = tx.r;
         let s = tx.s;
-    
+
         let pubkey = ecrecover(sighash, v, r, s, tx.chain_id).unwrap();
         let (addr, is_valid) = pub_to_addr(pubkey);
-    
+
         //format addr
         let addr_str = format!("{:?}", addr);
-    
+
         assert_eq!(addr_str, expected_addr_str);
         assert_eq!(is_valid, true);
     }
 
     #[test]
-    fn test_gas_base_fee_legacy(){
+    fn test_gas_base_fee_legacy() {
         let raw_tx = "f86d5c853f84fc751682520894bd0a42d14bd5cb0fb787476ad777241c210e979e872386f26fc1000080823f48a0dea7f6599e38b40757e31b4747059a264795d587a202426600655a81d2d9a27ea0051d012a55da07ae557edbef305eea1a034df90519002f4e24787f9a218aa280";
 
         let tx = get_transaction(raw_tx);
@@ -163,11 +161,10 @@ mod tests {
         let gas_limit = typedtx.gas().unwrap_or(&zero_bigint);
         assert_eq!(base_fee, U256::from(21000));
         assert_eq!(gas_limit.as_u128(), 21000 as u128);
-
     }
 
     #[test]
-    fn test_gas_base_fee_eip2930(){
+    fn test_gas_base_fee_eip2930() {
         let raw_tx = "01f90129821f9205832dc6c0832dc6c0946b92bdc43874fc19ead67ac7e37f2e126667b30780b844a9059cbb000000000000000000000000cd21d146980570e2dfb5f65a5881efbfdd882ab2000000000000000000000000000000000000000000000000016345785d8a0000f87cf87a946b92bdc43874fc19ead67ac7e37f2e126667b307f863a04d6102e88f63713248aa95286e545e26b440b909136464216b41036801218d26a0216d8091b2612eb7def258a018b1f2bdc6633976c86e5206357ff8385135f664a08066a4dac9c48b171b3aec8bfb10db23409617b8d8cc77acd57d766f7cc4f40080a0131cc2e628e7312f6f8ba901e83c75df0c780f99f588b3cd1d88d2d546140126a008e7e60fe3996a4601e4378d8a10c99ec30887d0dabdd6d8944b8c5a0c04caab";
         let tx = get_transaction(raw_tx);
         let typedtx = get_typed_transaction(&tx);
