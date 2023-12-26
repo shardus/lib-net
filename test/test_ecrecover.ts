@@ -40,12 +40,14 @@ function getTransactionObj(
   } else throw Error('tx obj fail')
 }
 
-// const legacy_tx = getTransactionObj({ raw: raw_tx2 })
-// const eip2930_tx = (getTransactionObj({ raw: raw_tx }));
+const legacy_tx = getTransactionObj({ raw: raw_tx2 })
+const eip2930_tx = (getTransactionObj({ raw: raw_tx }));
 //
 // console.log(legacy_tx.supports(Capability.EIP155ReplayProtection), legacy_tx.type, legacy_tx.common.chainId(), legacy_tx.getSenderAddress().toString());
-
-
+//
+// console.log(legacy_tx.common.param("gasPrices", "tx"), legacy_tx.gasLimit.toString(), legacy_tx.common.hardforks());
+// console.log(eip2930_tx.common.param("gasPrices", "tx"), eip2930_tx.gasLimit.toString(), eip2930_tx.common.hardforks());
+//
 let totalExecutionTime = 0
 const numberOfRuns = 10000
 

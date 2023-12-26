@@ -451,8 +451,15 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
 
     let result = cx.empty_object();
     let js_addr = cx.string(format!("{:?}", addr));
-    let js_is_valid = cx.boolean(is_valid);
 
+    let base_fee = shardeum_utils::get_base_fee(&typed_tx);
+    let binding_fee = shardeum_utils::zero_bigint();
+    let gas_limit = typed_tx.gas().unwrap_or(&binding_fee);
+
+    // this has to be upperbound inclusive
+    let gas_valid = gas_limit.ge(&base_fee);
+
+    let js_is_valid = cx.boolean(is_valid & gas_valid);
     result.set(cx, "address", js_addr)?;
     result.set(cx, "isValid", js_is_valid)?;
 

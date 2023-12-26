@@ -38,7 +38,7 @@ export const getSenderAddress = (raw_tx: string): string => {
   const raw_tx_trimmed = raw_tx.startsWith('0x') ? raw_tx.slice(2) : raw_tx
   const { address, isValid } = net.getSenderAddress(raw_tx_trimmed) as GetSenderAddressResult
   if (!isValid) {
-    throw new Error('invalid signature')
+    throw new Error('invalid signature or not enough gas limit')
   }
   return address
 }
