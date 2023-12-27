@@ -10,10 +10,10 @@ let raw_tx2 = "0xf86d5c853f84fc751682520894bd0a42d14bd5cb0fb787476ad777241c210e9
 let expected_addr_str2 = "0x32b6f2c027d4c9d99ca07d047d17987390a5eb39";
 
 console.log(getSenderAddress(raw_tx))
-console.log('Is EIP2930 Tx address consistent?:', getSenderAddress(raw_tx) === expected_addr_str)
+console.log('Is EIP2930 Tx address consistent?:', getSenderAddress(raw_tx).address === expected_addr_str)
 
 console.log(getSenderAddress(raw_tx2))
-console.log('Is Legacy Tx address consistent?:', getSenderAddress(raw_tx2) === expected_addr_str2)
+console.log('Is Legacy Tx address consistent?:', getSenderAddress(raw_tx2).address === expected_addr_str2)
 
 function getTransactionObj(
   tx
