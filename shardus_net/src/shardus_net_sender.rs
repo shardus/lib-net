@@ -1,6 +1,6 @@
 use super::runtime::RUNTIME;
-use crate::header_factory::{header_serialize_factory, wrap_serialized_message};
 use crate::header::header_types::Header;
+use crate::header_factory::{header_serialize_factory, wrap_serialized_message};
 use crate::message::Message;
 use crate::oneshot::Sender;
 use crate::shardus_crypto;
