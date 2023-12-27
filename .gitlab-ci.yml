@@ -18,7 +18,7 @@ prepare-job:
   script:
     - node -v
     - apt-get update
-    - npm ci  #install Node.js dependencies
+    - npm i  #install Node.js dependencies
 
 format-job:
   stage: build
