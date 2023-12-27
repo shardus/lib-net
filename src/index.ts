@@ -37,7 +37,7 @@ export const getSenderAddress = (raw_tx: string): GetSenderAddressResult => {
   //trim the 0x if it is there
   const raw_tx_trimmed = raw_tx.startsWith('0x') ? raw_tx.slice(2) : raw_tx
   const result = net.getSenderAddress(raw_tx_trimmed) as GetSenderAddressResult
-  return result;
+  return result
 }
 
 export const Sn = (opts: SnOpts) => {
