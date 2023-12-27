@@ -444,7 +444,7 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
     // They hash things differently than legacy and chainid is integrated into v.
     let pubkey = match tx.transaction_type {
         Some(_) => shardeum_utils::ecrecover(sighash, v + 27, r, s, None).unwrap(),
-        None => shardeum_utils::ecrecover(sighash, v, r, s, tx.chain_id).unwrap()
+        None => shardeum_utils::ecrecover(sighash, v, r, s, tx.chain_id).unwrap(),
     };
 
     let (addr, is_valid) = shardeum_utils::pub_to_addr(pubkey);
@@ -466,9 +466,6 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
     Ok(result)
 }
 
-
-
-
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     //SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
@@ -476,7 +473,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("Sn", create_shardus_net)?;
 
     cx.export_function("setLoggingEnabled", set_logging_enabled)?;
-    
+
     cx.export_function("getSenderAddress", get_sender_address)?;
 
     Ok(())
