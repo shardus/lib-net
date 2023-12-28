@@ -313,23 +313,6 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
         receivers.push(receiver);
     }
 
-    let mut addresses = Vec::new();
-    for (host, port) in hosts.iter().zip(ports.iter()) {
-        match (host as &str, *port).to_socket_addrs() {
-            Ok(addr_iter) => addresses.extend(addr_iter),
-            Err(_) => return cx.throw_type_error(format!("The provided address {}:{} is not valid", host, port)),
-        }
-    }
-
-    if addresses.is_empty() {
-        return cx.throw_type_error("No valid addresses provided");
-    }
-
-    // Send each address with its corresponding sender
-    
-    shardus_net_sender.multi_send_with_header(addresses, header_version, header, data, senders);
-    
-
     // Handle the responses asynchronously
     for receiver in receivers {
         let channel = channel.clone();
@@ -361,6 +344,21 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
         });
     }
 
+    let mut addresses = Vec::new();
+    for (host, port) in hosts.iter().zip(ports.iter()) {
+        match (host as &str, *port).to_socket_addrs() {
+            Ok(addr_iter) => addresses.extend(addr_iter),
+            Err(_) => return cx.throw_type_error(format!("The provided address {}:{} is not valid", host, port)),
+        }
+    }
+
+    if addresses.is_empty() {
+        return cx.throw_type_error("No valid addresses provided");
+    }
+
+    // Send each address with its corresponding sender
+    shardus_net_sender.multi_send_with_header(addresses, header_version, header, data, senders);
+    
     Ok(cx.undefined())
 }
 
