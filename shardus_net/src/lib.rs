@@ -68,6 +68,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let listen = JsFunction::new(cx, listen)?;
     let send = JsFunction::new(cx, send)?;
     let send_with_header = JsFunction::new(cx, send_with_header)?;
+    let multi_send_with_header = JsFunction::new(cx, multi_send_with_header)?;
     let get_stats: Handle<'_, JsFunction> = JsFunction::new(cx, get_stats)?;
     let evict_socket = JsFunction::new(cx, evict_socket)?;
 
@@ -78,6 +79,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     shardus_net.set(cx, "listen", listen)?;
     shardus_net.set(cx, "send", send)?;
     shardus_net.set(cx, "send_with_header", send_with_header)?;
+    shardus_net.set(cx, "multi_send_with_header", multi_send_with_header)?;
     shardus_net.set(cx, "evict_socket", evict_socket)?;
     shardus_net.set(cx, "stats", get_stats)?;
 
@@ -272,6 +274,94 @@ pub fn send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         }
         Err(_) => cx.throw_type_error("The provided address is not valid"),
     }
+}
+
+pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let cx = &mut cx;
+
+    let ports_js_array = cx.argument::<JsArray>(0)?;
+    let hosts_js_array = cx.argument::<JsArray>(1)?;
+    let ports: Vec<u16> = ports_js_array.to_vec(cx)?.iter().map(|val| val.downcast::<JsNumber, _>(cx).unwrap().value(cx) as u16).collect();
+    let hosts: Vec<String> = hosts_js_array.to_vec(cx)?.iter().map(|val| val.downcast::<JsString, _>(cx).unwrap().value(cx)).collect();
+
+    let header_version: u8 = cx.argument::<JsNumber>(2)?.value(cx) as u8;
+    let header_js_string: String = cx.argument::<JsString>(3)?.value(cx) as String;
+    let data_js_string: String = cx.argument::<JsString>(4)?.value(cx) as String;
+    let complete_cb = cx.argument::<JsFunction>(5)?.root(cx);
+
+    let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
+    let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
+
+    let this = cx.this().root(cx);
+    let channel = cx.channel();
+
+    stats_incrementers.increment_outstanding_sends();
+
+    let header = match header_from_json_string(&header_js_string, &header_version) {
+        Some(header) => header,
+        None => return cx.throw_error("Failed to parse header"),
+    };
+
+    let data = data_js_string.into_bytes().to_vec();
+
+    // Create oneshot channels for each host-port pair
+    let mut senders = Vec::with_capacity(hosts.len());
+    let mut receivers = Vec::with_capacity(hosts.len());
+    for _ in 0..hosts.len() {
+        let (sender, receiver) = oneshot::channel::<SendResult>();
+        senders.push(sender);
+        receivers.push(receiver);
+    }
+
+    let mut addresses = Vec::new();
+    for (host, port) in hosts.iter().zip(ports.iter()) {
+        match (host as &str, *port).to_socket_addrs() {
+            Ok(addr_iter) => addresses.extend(addr_iter),
+            Err(_) => return cx.throw_type_error(format!("The provided address {}:{} is not valid", host, port)),
+        }
+    }
+
+    if addresses.is_empty() {
+        return cx.throw_type_error("No valid addresses provided");
+    }
+
+    // Send each address with its corresponding sender
+    
+    shardus_net_sender.multi_send_with_header(addresses, header_version, header, data, senders);
+    
+
+    // Handle the responses asynchronously
+    for receiver in receivers {
+        let channel = channel.clone();
+        let this = this.clone(cx);
+        let complete_cb = complete_cb.clone(cx);
+
+        RUNTIME.spawn(async move {
+            let result = receiver.await.expect("Complete send tx dropped before notify");
+    
+            RUNTIME.spawn_blocking(move || {
+                channel.send(move |mut cx| {
+                    let cx = &mut cx;
+                    let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+                    (**stats).borrow_mut().decrement_outstanding_sends();
+    
+                    let this = cx.undefined();
+                    let mut args = Vec::new();
+    
+                    if let Err(err) = result {
+                        let error = cx.string(format!("{:?}", err));
+                        args.push(error);
+                    }
+    
+                    complete_cb.to_inner(cx).call(cx, this, args)?;
+    
+                    Ok(())
+                });
+            });
+        });
+    }
+
+    Ok(cx.undefined())
 }
 
 fn get_stats(mut cx: FunctionContext) -> JsResult<JsObject> {

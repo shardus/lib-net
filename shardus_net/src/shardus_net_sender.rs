@@ -73,6 +73,22 @@ impl ShardusNetSender {
             .expect("Unexpected! Failed to send data with header to channel. Sender task must have been dropped.");
     }
 
+    // multi_send_with_header: send data to multiple socket addresses with a single header and signature
+    pub fn multi_send_with_header(&self, addresses: Vec<SocketAddr>, header_version: u8, mut header: Header, data: Vec<u8>, senders: Vec<Sender<SendResult>>) {
+        let compressed_data = header.compress(data);
+        header.set_message_length(compressed_data.len() as u32);
+        let serialized_header = header_serialize_factory(header_version, header).expect("Failed to serialize header");
+        let mut message = Message::new_unsigned(header_version, serialized_header.clone(), compressed_data.clone());
+        message.sign(shardus_crypto::get_shardus_crypto_instance(), &self.key_pair);
+        let serialized_message = wrap_serialized_message(message.serialize());
+    
+        for (address, sender) in addresses.into_iter().zip(senders.into_iter()) {
+            self.send_channel
+                .send((address, serialized_message.clone(), sender))
+                .expect("Failed to send data with header to channel");
+        }
+    }
+
     pub fn evict_socket(&self, address: SocketAddr) {
         self.evict_socket_channel
             .send(address)
