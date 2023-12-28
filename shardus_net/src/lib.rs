@@ -280,9 +280,27 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
     let cx = &mut cx;
 
     let ports_js_array = cx.argument::<JsArray>(0)?;
+    let ports_result: NeonResult<Vec<u16>> = ports_js_array.to_vec(cx)?
+        .iter()
+        .map(|val| {
+            val.downcast::<JsNumber, _>(cx)
+                .or_throw(cx)
+                .map(|js_number| js_number.value(cx) as u16)
+        })
+        .collect(); // Collects into a Result<Vec<u16>, _>
+    let ports = ports_result?; // Handle error or unwrap the result
+
+    // Convert the JavaScript array of hosts to a Vec<String> in Rust
     let hosts_js_array = cx.argument::<JsArray>(1)?;
-    let ports: Vec<u16> = ports_js_array.to_vec(cx)?.iter().map(|val| val.downcast::<JsNumber, _>(cx).unwrap().value(cx) as u16).collect();
-    let hosts: Vec<String> = hosts_js_array.to_vec(cx)?.iter().map(|val| val.downcast::<JsString, _>(cx).unwrap().value(cx)).collect();
+    let hosts_result: NeonResult<Vec<String>> = hosts_js_array.to_vec(cx)?
+        .iter()
+        .map(|val| {
+            val.downcast::<JsString, _>(cx)
+                .or_throw(cx)
+                .map(|js_string| js_string.value(cx))
+        })
+        .collect(); // Collects into a Result<Vec<String>, _>
+    let hosts = hosts_result?; // Handle error or unwrap the result
 
     let header_version: u8 = cx.argument::<JsNumber>(2)?.value(cx) as u8;
     let header_js_string: String = cx.argument::<JsString>(3)?.value(cx) as String;
