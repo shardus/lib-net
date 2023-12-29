@@ -137,9 +137,10 @@ export const Sn = (opts: SnOpts) => {
         }
       }
       if (optionalHeader && stringifiedHeader !== null) {
-        
         /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
+        
         if(Array.isArray(port) && Array.isArray(address)){
+          if(logFlags.net_verbose) console.log('multi_send_with_header')
           _net.multi_send_with_header(
             port,
             address,
@@ -148,7 +149,6 @@ export const Sn = (opts: SnOpts) => {
             stringifiedData,
             sendCallback
           )
-          if(logFlags.net_verbose) console.log('multi_send_with_header')
         } else {
           if(logFlags.net_verbose) console.log('send_with_header')
           _net.send_with_header(
