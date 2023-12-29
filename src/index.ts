@@ -138,7 +138,7 @@ export const Sn = (opts: SnOpts) => {
       }
       if (optionalHeader && stringifiedHeader !== null) {
         /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
-        
+        // if it is a multi send operation, from shardus-core, array of ports and addresses shall be sent.
         if(Array.isArray(port) && Array.isArray(address)){
           if(logFlags.net_verbose) console.log('multi_send_with_header')
           _net.multi_send_with_header(
@@ -207,6 +207,20 @@ export const Sn = (opts: SnOpts) => {
     })
   }
 
+  /**
+   * Asynchronously sends data to multiple destinations with additional header information.
+   * This function allows for sending data across different ports and addresses with a specified header and timeout settings.
+   * It supports both 'ask' and 'tell' message directions based on the response callback provided.
+   * 
+   * @param {number[]} ports - An array of port numbers to which the data will be sent.
+   * @param {string[]} addresses - An array of IP addresses corresponding to the ports for data transmission.
+   * @param {unknown} data - The data to be sent. The type is unknown, allowing for flexibility in the data sent.
+   * @param {AppHeader} header - The application header information to be included with the data.
+   * @param [timeout=0] - Optional timeout for the data transmission. Defaults to 0 if not provided.
+   * @param {ResponseCallback} [onResponse=noop] - Optional callback function to handle responses. Defaults to a no-operation function if not provided.
+   * @param {TimeoutCallback} [onTimeout=noop] - Optional callback function to handle timeout events. Defaults to a no-operation function if not provided.
+   * @returns - The result of the `_sendAug` function, which handles the actual data transmission process.
+   */
   const multiSendWithHeader = async(
     ports: number[], // Array of port numbers
     addresses: string[], // Array of IP addresses
