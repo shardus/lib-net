@@ -110,8 +110,8 @@ export const Sn = (opts: SnOpts) => {
    * @returns
    */
   const _sendAug = async (
-    port: number,
-    address: string,
+    port: number | number[],
+    address: string | string[],
     augData: AugmentedData,
     timeout: number,
     onResponse: ResponseCallback,
@@ -137,15 +137,30 @@ export const Sn = (opts: SnOpts) => {
         }
       }
       if (optionalHeader && stringifiedHeader !== null) {
+        
         /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
-        _net.send_with_header(
-          port,
-          address,
-          optionalHeader.version,
-          stringifiedHeader,
-          stringifiedData,
-          sendCallback
-        )
+        if(Array.isArray(port) && Array.isArray(address)){
+          _net.multi_send_with_header(
+            port,
+            address,
+            optionalHeader.version,
+            stringifiedHeader,
+            stringifiedData,
+            sendCallback
+          )
+          if(logFlags.net_verbose) console.log('multi_send_with_header')
+        } else {
+          if(logFlags.net_verbose) console.log('send_with_header')
+          _net.send_with_header(
+            port,
+            address,
+            optionalHeader.version,
+            stringifiedHeader,
+            stringifiedData,
+            sendCallback
+          )
+        }
+        
       } else {
         /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
         _net.send(port, address, stringifiedData, sendCallback)
@@ -189,6 +204,38 @@ export const Sn = (opts: SnOpts) => {
           timestamp: Date.now(),
         }
       }
+    })
+  }
+
+  const multiSendWithHeader = async(
+    ports: number[], // Array of port numbers
+    addresses: string[], // Array of IP addresses
+    data: unknown,
+    header: AppHeader,
+    timeout = 0,
+    onResponse: ResponseCallback = noop,
+    onTimeout: TimeoutCallback = noop
+  ) => {
+    const UUID = uuid()
+
+    let msgDir: 'ask' | 'tell' = 'ask'
+    if (onResponse === noop) {
+      msgDir = 'tell'
+    }
+
+    const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
+
+    const combinedHeader: CombinedHeader = {
+      uuid: UUID,
+      sender_id: header.sender_id,
+      tracker_id: header.tracker_id,
+      verification_data: header.verification_data,
+      compression: header.compression,
+    }
+
+    return _sendAug(ports, addresses, augData, timeout, onResponse, onTimeout, {
+      version: HEADER_OPTS.sendHeaderVersion,
+      headerData: combinedHeader,
     })
   }
 
@@ -424,6 +471,7 @@ export const Sn = (opts: SnOpts) => {
   const returnVal = {
     send,
     sendWithHeader,
+    multiSendWithHeader,
     listen,
     stopListening,
     stats,
