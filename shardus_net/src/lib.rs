@@ -280,25 +280,19 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
     let cx = &mut cx;
 
     let ports_js_array = cx.argument::<JsArray>(0)?;
-    let ports_result: NeonResult<Vec<u16>> = ports_js_array.to_vec(cx)?
+    let ports_result: NeonResult<Vec<u16>> = ports_js_array
+        .to_vec(cx)?
         .iter()
-        .map(|val| {
-            val.downcast::<JsNumber, _>(cx)
-                .or_throw(cx)
-                .map(|js_number| js_number.value(cx) as u16)
-        })
+        .map(|val| val.downcast::<JsNumber, _>(cx).or_throw(cx).map(|js_number| js_number.value(cx) as u16))
         .collect(); // Collects into a Result<Vec<u16>, _>
     let ports = ports_result?; // Handle error or unwrap the result
 
     // Convert the JavaScript array of hosts to a Vec<String> in Rust
     let hosts_js_array = cx.argument::<JsArray>(1)?;
-    let hosts_result: NeonResult<Vec<String>> = hosts_js_array.to_vec(cx)?
+    let hosts_result: NeonResult<Vec<String>> = hosts_js_array
+        .to_vec(cx)?
         .iter()
-        .map(|val| {
-            val.downcast::<JsString, _>(cx)
-                .or_throw(cx)
-                .map(|js_string| js_string.value(cx))
-        })
+        .map(|val| val.downcast::<JsString, _>(cx).or_throw(cx).map(|js_string| js_string.value(cx)))
         .collect(); // Collects into a Result<Vec<String>, _>
     let hosts = hosts_result?; // Handle error or unwrap the result
 
@@ -306,6 +300,7 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
     let header_js_string: String = cx.argument::<JsString>(3)?.value(cx) as String;
     let data_js_string: String = cx.argument::<JsString>(4)?.value(cx) as String;
     let complete_cb = cx.argument::<JsFunction>(5)?.root(cx);
+    let await_processing = cx.argument::<JsBoolean>(6)?.value(cx);
 
     let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
     let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
@@ -339,26 +334,28 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
 
         RUNTIME.spawn(async move {
             let result = receiver.await.expect("Complete send tx dropped before notify");
-    
-            RUNTIME.spawn_blocking(move || {
-                channel.send(move |mut cx| {
-                    let cx = &mut cx;
-                    let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
-                    (**stats).borrow_mut().decrement_outstanding_sends();
-    
-                    let this = cx.undefined();
-                    let mut args = Vec::new();
-    
-                    if let Err(err) = result {
-                        let error = cx.string(format!("{:?}", err));
-                        args.push(error);
-                    }
-    
-                    complete_cb.to_inner(cx).call(cx, this, args)?;
-    
-                    Ok(())
+
+            if await_processing {
+                RUNTIME.spawn_blocking(move || {
+                    channel.send(move |mut cx| {
+                        let cx = &mut cx;
+                        let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+                        (**stats).borrow_mut().decrement_outstanding_sends();
+
+                        let this = cx.undefined();
+                        let mut args = Vec::new();
+
+                        if let Err(err) = result {
+                            let error = cx.string(format!("{:?}", err));
+                            args.push(error);
+                        }
+
+                        complete_cb.to_inner(cx).call(cx, this, args)?;
+
+                        Ok(())
+                    });
                 });
-            });
+            }
         });
     }
 
@@ -376,7 +373,7 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
 
     // Send each address with its corresponding sender
     shardus_net_sender.multi_send_with_header(addresses, header_version, header, data, senders);
-    
+
     Ok(cx.undefined())
 }
 

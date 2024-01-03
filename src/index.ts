@@ -119,7 +119,8 @@ export const Sn = (opts: SnOpts) => {
     optionalHeader?: {
       version: number
       headerData: CombinedHeader
-    }
+    },
+    awaitProcessing?: boolean
   ) => {
     const stringifiedData = stringifyData(augData, opts.customStringifier)
     const stringifiedHeader = optionalHeader
@@ -139,18 +140,19 @@ export const Sn = (opts: SnOpts) => {
       if (optionalHeader && stringifiedHeader !== null) {
         /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
         // if it is a multi send operation, from shardus-core, array of ports and addresses shall be sent.
-        if(Array.isArray(port) && Array.isArray(address)){
-          if(logFlags.net_verbose) console.log('multi_send_with_header')
+        if (Array.isArray(port) && Array.isArray(address)) {
+          if (logFlags.net_verbose) console.log('multi_send_with_header')
           _net.multi_send_with_header(
             port,
             address,
             optionalHeader.version,
             stringifiedHeader,
             stringifiedData,
-            sendCallback
+            sendCallback,
+            awaitProcessing
           )
         } else {
-          if(logFlags.net_verbose) console.log('send_with_header')
+          if (logFlags.net_verbose) console.log('send_with_header')
           _net.send_with_header(
             port,
             address,
@@ -160,7 +162,6 @@ export const Sn = (opts: SnOpts) => {
             sendCallback
           )
         }
-        
       } else {
         /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
         _net.send(port, address, stringifiedData, sendCallback)
@@ -211,7 +212,7 @@ export const Sn = (opts: SnOpts) => {
    * Asynchronously sends data to multiple destinations with additional header information.
    * This function allows for sending data across different ports and addresses with a specified header and timeout settings.
    * It supports both 'ask' and 'tell' message directions based on the response callback provided.
-   * 
+   *
    * @param {number[]} ports - An array of port numbers to which the data will be sent.
    * @param {string[]} addresses - An array of IP addresses corresponding to the ports for data transmission.
    * @param {unknown} data - The data to be sent. The type is unknown, allowing for flexibility in the data sent.
@@ -221,14 +222,15 @@ export const Sn = (opts: SnOpts) => {
    * @param {TimeoutCallback} [onTimeout=noop] - Optional callback function to handle timeout events. Defaults to a no-operation function if not provided.
    * @returns - The result of the `_sendAug` function, which handles the actual data transmission process.
    */
-  const multiSendWithHeader = async(
+  const multiSendWithHeader = async (
     ports: number[], // Array of port numbers
     addresses: string[], // Array of IP addresses
     data: unknown,
     header: AppHeader,
     timeout = 0,
     onResponse: ResponseCallback = noop,
-    onTimeout: TimeoutCallback = noop
+    onTimeout: TimeoutCallback = noop,
+    awaitProcessing: boolean = true
   ) => {
     const UUID = uuid()
 
@@ -247,10 +249,19 @@ export const Sn = (opts: SnOpts) => {
       compression: header.compression,
     }
 
-    return _sendAug(ports, addresses, augData, timeout, onResponse, onTimeout, {
-      version: HEADER_OPTS.sendHeaderVersion,
-      headerData: combinedHeader,
-    })
+    return _sendAug(
+      ports,
+      addresses,
+      augData,
+      timeout,
+      onResponse,
+      onTimeout,
+      {
+        version: HEADER_OPTS.sendHeaderVersion,
+        headerData: combinedHeader,
+      },
+      awaitProcessing
+    )
   }
 
   const sendWithHeader = async (
