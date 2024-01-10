@@ -10,6 +10,7 @@ cache:
 stages:
   - prepare
   - build
+  - test
   - appsec
 
 # Prepare job: Install Node.js dependencies
@@ -45,3 +46,21 @@ lint-job:
     - echo "Running ESlint..."
     - npm run lint
     - echo "Running ESlint complete."
+
+run-test:
+  stage: test
+  script:
+    - npm run test
+
+rust-lint:
+  stage: build
+  script:
+    - cargo clippy --all-targets --all-features -- -D warnings
+    - RUSTFLAGS=-Wunused-crate-dependencies cargo build
+
+rust-audit:
+  stage: appsec
+  before_script:
+    - cargo install cargo-audit
+  script:
+    - cargo audit

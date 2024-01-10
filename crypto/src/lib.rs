@@ -1,3 +1,4 @@
+#![deny(warnings)]
 extern crate sodiumoxide;
 
 use core::fmt;
@@ -83,7 +84,7 @@ impl ShardusCrypto {
     ///
     /// Panics if the input cannot be hashed.
     pub fn hash(&self, input: &Buffer, fmt: Format) -> HexStringOrBuffer {
-        let digest = sodiumoxide::crypto::generichash::hash(&input, Some(32), Some(&self.hash_key)).expect("Cannot digest input");
+        let digest = sodiumoxide::crypto::generichash::hash(input, Some(32), Some(&self.hash_key)).expect("Cannot digest input");
 
         match fmt {
             Format::Hex => HexStringOrBuffer::Hex(sodiumoxide::hex::encode(&digest)),
@@ -136,7 +137,7 @@ impl ShardusCrypto {
             HexStringOrBuffer::Buffer(buf) => buf.clone(),
         };
 
-        let opened = sodiumoxide::crypto::sign::verify(&sig.as_slice(), pk);
+        let opened = sodiumoxide::crypto::sign::verify(sig.as_slice(), pk);
 
         match opened {
             Ok(opened_msg) => opened_msg == msg_buf,
@@ -157,7 +158,7 @@ mod tests {
 
         let result = sc.hash(&"hello world".to_string().into_bytes(), Format::Hex);
 
-        info!("Shardus-crypto compatibility Test: hash - result: {}", result.to_string());
+        info!("Shardus-crypto compatibility Test: hash - result: {}", result);
 
         // this hashed comes from shardus-crypto-utils nodejs library with the same input string and hash key
         let expected = "463bad7a09d224af5251be7d979cc8db3df37c422ea38d6c3986c54ee9c8f116".to_string();
@@ -220,7 +221,7 @@ mod tests {
 
         let result = sc.verify(&HexStringOrBuffer::Hex(some_hex_string), &decoded_buf_sig.to_vec(), &pk);
 
-        assert_eq!(true, result);
+        assert!(result);
     }
 
     #[test]
@@ -234,8 +235,8 @@ mod tests {
 
         let some_message = "hello world".as_bytes().to_vec();
         let sig = sc.sign(HexStringOrBuffer::Buffer(some_message.clone()), &sk).expect("Couldn't sign buffer");
-        let result = sc.verify(&HexStringOrBuffer::Buffer(some_message.clone()), &sig, &pk);
+        let result = sc.verify(&HexStringOrBuffer::Buffer(some_message), &sig, &pk);
 
-        assert_eq!(true, result);
+        assert!(result);
     }
 }

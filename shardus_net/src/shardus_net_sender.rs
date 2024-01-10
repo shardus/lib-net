@@ -4,7 +4,9 @@ use crate::header_factory::{header_serialize_factory, wrap_serialized_message};
 use crate::message::Message;
 use crate::oneshot::Sender;
 use crate::shardus_crypto;
-use log::{error, info};
+use log::error;
+#[cfg(debug)]
+use log::info;
 use std::collections::HashMap;
 
 use std::io;
@@ -63,7 +65,7 @@ impl ShardusNetSender {
         let compressed_data = header.compress(data);
         header.set_message_length(compressed_data.len() as u32);
         let serialized_header = header_serialize_factory(header_version, header).expect("Failed to serialize header");
-        let mut message = Message::new_unsigned(header_version, serialized_header.clone(), compressed_data.clone());
+        let mut message = Message::new_unsigned(header_version, serialized_header, compressed_data);
         message.sign(shardus_crypto::get_shardus_crypto_instance(), &self.key_pair);
         let serialized_message = wrap_serialized_message(message.serialize());
         self.send_channel
@@ -84,9 +86,11 @@ impl ShardusNetSender {
             while let Some(address) = evict_socket_channel_rx.recv().await {
                 let mut connections = connections.lock().await;
                 connections.remove(&address);
+                #[cfg(debug)]
                 info!("Evicted socket {} from cache", address);
             }
 
+            #[cfg(debug)]
             info!("Evictor channel complete. Shutting down evictor task.")
         });
     }
@@ -107,6 +111,7 @@ impl ShardusNetSender {
                 });
             }
 
+            #[cfg(debug)]
             info!("Sending channel complete. Shutting down sending task.")
         });
     }
@@ -133,6 +138,7 @@ impl Connection {
         let result = Self::write_data_to_stream(socket, data.clone()).await;
 
         if result.is_err() {
+            #[cfg(debug)]
             info!("Failed to send data to {}. Attempting to reconnect and try again.", self.address);
 
             // There was an error sending data. The connection might have been previously closed.
@@ -202,6 +208,7 @@ impl ConnectionCache for HashMap<SocketAddr, Arc<Connection>> {
 
 impl ConnectionCache for LruCache<SocketAddr, Arc<Connection>> {
     fn get_or_insert(&mut self, address: SocketAddr) -> Arc<Connection> {
+        #[cfg(debug)]
         info!("LruCache stats, current_size: {}, capacity: {}", self.len(), self.cap());
         match self.get(&address) {
             Some(connection) => connection.clone(),

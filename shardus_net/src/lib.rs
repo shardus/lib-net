@@ -1,3 +1,4 @@
+#![deny(warnings)]
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -7,6 +8,7 @@ use std::time::Instant;
 use std::{net::ToSocketAddrs, sync::Arc};
 
 use header_factory::header_from_json_string;
+#[cfg(debug)]
 use log::info;
 //use log::LevelFilter;
 use lru::LruCache;
@@ -29,7 +31,6 @@ use runtime::RUNTIME;
 use shardus_net_listener::ShardusNetListener;
 use shardus_net_sender::ConnectionCache;
 use shardus_net_sender::{SendResult, ShardusNetSender};
-//use simplelog::{Config, SimpleLogger};
 use stats::{Incrementers, Stats, StatsResult};
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
@@ -83,8 +84,8 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
 fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
     let callback = cx.argument::<JsFunction>(0)?.root(cx);
-    let shardus_net_listener = cx.this().get(cx, "_listener")?.downcast_or_throw::<JsBox<Arc<ShardusNetListener>>, _>(cx)?;
-    let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
+    let shardus_net_listener = cx.this().get::<JsBox<Arc<ShardusNetListener>>, _, _>(cx, "_listener")?;
+    let stats_incrementers = cx.this().get::<JsBox<Incrementers>, _, _>(cx, "_stats_incrementers")?;
     let stats_incrementers = (**stats_incrementers).clone();
     let this = cx.this().root(cx);
 
@@ -112,7 +113,7 @@ fn listen(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     let cx = &mut cx;
 
                     let elapsed = now.elapsed();
-                    let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+                    let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
                     let mut stats = (**stats).borrow_mut();
 
                     stats.decrement_outstanding_receives();
@@ -165,8 +166,8 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let host = cx.argument::<JsString>(1)?.value(cx);
     let data = cx.argument::<JsString>(2)?.value(cx);
     let complete_cb = cx.argument::<JsFunction>(3)?.root(cx);
-    let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
-    let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
+    let shardus_net_sender = cx.this().get::<JsBox<Arc<ShardusNetSender>>, _, _>(cx, "_sender")?;
+    let stats_incrementers = cx.this().get::<JsBox<Incrementers>, _, _>(cx, "_stats_incrementers")?;
 
     let this = cx.this().root(cx);
     let channel = cx.channel();
@@ -180,18 +181,17 @@ fn send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         RUNTIME.spawn_blocking(move || {
             channel.send(move |mut cx| {
                 let cx = &mut cx;
-                let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+                let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
                 (**stats).borrow_mut().decrement_outstanding_sends();
 
                 let this = cx.undefined();
-                let mut args = Vec::new();
 
                 if let Err(err) = result {
                     let error = cx.string(format!("{:?}", err));
-                    args.push(error);
+                    complete_cb.to_inner(cx).call(cx, this, [error.upcast()])?;
+                } else {
+                    complete_cb.to_inner(cx).call(cx, this, [])?;
                 }
-
-                complete_cb.to_inner(cx).call(cx, this, args)?;
 
                 Ok(())
             });
@@ -218,8 +218,8 @@ pub fn send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let data_js_string: String = cx.argument::<JsString>(4)?.value(cx) as String;
     let complete_cb = cx.argument::<JsFunction>(5)?.root(cx);
 
-    let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
-    let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
+    let shardus_net_sender = cx.this().get::<JsBox<Arc<ShardusNetSender>>, _, _>(cx, "_sender")?;
+    let stats_incrementers = cx.this().get::<JsBox<Incrementers>, _, _>(cx, "_stats_incrementers")?;
 
     let this = cx.this().root(cx);
     let channel = cx.channel();
@@ -243,25 +243,24 @@ pub fn send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         RUNTIME.spawn_blocking(move || {
             channel.send(move |mut cx| {
                 let cx = &mut cx;
-                let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+                let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
                 (**stats).borrow_mut().decrement_outstanding_sends();
 
                 let this = cx.undefined();
-                let mut args = Vec::new();
 
                 if let Err(err) = result {
                     let error = cx.string(format!("{:?}", err));
-                    args.push(error);
+                    complete_cb.to_inner(cx).call(cx, this, [error.upcast()])?;
+                } else {
+                    complete_cb.to_inner(cx).call(cx, this, [])?;
                 }
-
-                complete_cb.to_inner(cx).call(cx, this, args)?;
 
                 Ok(())
             });
         });
     });
 
-    match (host, port as u16).to_socket_addrs() {
+    match (host, port).to_socket_addrs() {
         Ok(mut address) => {
             let address = address.next().expect("Expected at least one address");
             shardus_net_sender.send_with_header(address, header_version, header, data, complete_tx);
@@ -274,7 +273,7 @@ pub fn send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 fn get_stats(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
-    let stats = cx.this().get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+    let stats = cx.this().get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
     let stats = (**stats).borrow_mut().get_stats();
     let stats = stats.to_object(cx)?;
 
@@ -285,7 +284,7 @@ fn evict_socket(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let cx = &mut cx;
     let port = cx.argument::<JsNumber>(0)?.value(cx);
     let host = cx.argument::<JsString>(1)?.value(cx);
-    let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
+    let shardus_net_sender = cx.this().get::<JsBox<Arc<ShardusNetSender>>, _, _>(cx, "_sender")?;
 
     match (host, port as u16).to_socket_addrs() {
         Ok(mut address) => {
@@ -313,9 +312,11 @@ fn create_shardus_net_listener(cx: &mut FunctionContext, port: f64, host: String
 
 fn create_shardus_net_sender(use_lru: bool, lru_size: NonZeroUsize, key_pair: crypto::KeyPair) -> Arc<ShardusNetSender> {
     let connections: Arc<Mutex<dyn ConnectionCache + Send>> = if use_lru {
+        #[cfg(debug)]
         info!("Using LRU cache with size {} for socket mgmt", lru_size.get());
         Arc::new(Mutex::new(LruCache::new(lru_size)))
     } else {
+        #[cfg(debug)]
         info!("Using hashmap for socket mgmt");
         Arc::new(Mutex::new(HashMap::<SocketAddr, Arc<Connection>>::new()))
     };
@@ -415,16 +416,6 @@ fn set_logging_enabled(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     } else {
         log::set_max_level(log::LevelFilter::Off);
     }
-    //not sure if this is needed:
-    // if enabled {
-    //     //SimpleLogger::init_with_level(LevelFilter::Info).unwrap();
-    //     //SimpleLogger::set_level(LevelFilter::Info);
-    //     SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
-    // } else {
-    //     //SimpleLogger::init_with_level(LevelFilter::Off).unwrap();
-    //     //SimpleLogger::set_level(LevelFilter::Off);
-    //     SimpleLogger::init(LevelFilter::Off, Config::default()).unwrap();
-    // }
     Ok(cx.undefined())
 }
 
@@ -468,8 +459,6 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    //SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap();
-
     cx.export_function("Sn", create_shardus_net)?;
 
     cx.export_function("setLoggingEnabled", set_logging_enabled)?;
