@@ -3,7 +3,7 @@ use uuid::Uuid;
 extern crate serde;
 extern crate serde_json;
 
-use crate::compression::compression::Compression;
+use crate::compression::Compression;
 use serde::Deserialize;
 
 #[derive(Deserialize)]

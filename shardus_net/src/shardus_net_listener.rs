@@ -90,10 +90,9 @@ impl ShardusNetListener {
     }
 
     async fn receive(socket_stream: TcpStream, remote_addr: SocketAddr, received_msg_tx: UnboundedSender<(String, SocketAddr, Option<RequestMetadata>)>) -> ListenerResult<()> {
-        let mut socket_stream = socket_stream;
+        let mut socket_stream: TcpStream = socket_stream;
         while let Ok(msg_len) = socket_stream.read_u32().await {
-            let msg_len = msg_len as usize;
-            let mut buffer = Vec::with_capacity(msg_len);
+            let mut buffer: Vec<u8> = vec![0; msg_len as usize];
 
             // @TODO: Do a security check in the case that a sender sends an incorrect length.
 
@@ -101,7 +100,7 @@ impl ShardusNetListener {
             // 1. The capacity has been set above and the length is <= capacity.
             // 2. We are calling read_exact which will fill the full length of the array.
             unsafe {
-                buffer.set_len(msg_len);
+                buffer.set_len(msg_len as usize);
             }
 
             socket_stream.read_exact(&mut buffer).await?;
@@ -113,7 +112,7 @@ impl ShardusNetListener {
                 let mut cursor = Cursor::new(msg_bytes.to_vec());
                 let message = Message::deserialize(&mut cursor).expect("Failed to deserialize message");
 
-                if message.verify(shardus_crypto::get_shardus_crypto_instance()) == false {
+                if !message.verify(shardus_crypto::get_shardus_crypto_instance()) {
                     error!("Failed to verify message signature");
                     continue;
                 }
@@ -124,7 +123,7 @@ impl ShardusNetListener {
 
                 let data = message.data;
 
-                if header.validate(data.clone()) == false {
+                if !header.validate(data.clone()) {
                     error!("Failed to validate data with header");
                     continue;
                 }

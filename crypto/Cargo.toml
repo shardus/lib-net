@@ -5,5 +5,10 @@ edition = "2021"
 
 [dependencies]
 sodiumoxide = "0.2.7"
+
+[features]
+default=[]
+debug=[]
+
+[dev-dependencies]
 log = "0.4"
-simplelog = "^0.10.0"

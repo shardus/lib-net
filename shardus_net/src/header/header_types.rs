@@ -1,4 +1,4 @@
-use crate::compression::compression::Compression;
+use crate::compression::Compression;
 
 use super::header_v1::HeaderV1;
 

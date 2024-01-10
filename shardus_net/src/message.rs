@@ -46,8 +46,7 @@ impl Message {
         let unsigned = self.serialize_unsigned();
         let hash = crypto.hash(&unsigned, Buffer);
         let owner = self.sign.owner.clone();
-        let result = crypto.verify(&hash, &self.sign.sig, &crypto.get_pk(&crypto::HexStringOrBuffer::Buffer(owner)));
-        result
+        crypto.verify(&hash, &self.sign.sig, &crypto.get_pk(&crypto::HexStringOrBuffer::Buffer(owner)))
     }
 
     pub fn serialize_unsigned(&self) -> Vec<u8> {
