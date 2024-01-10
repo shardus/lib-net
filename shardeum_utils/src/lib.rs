@@ -60,8 +60,7 @@ pub fn pub_to_addr(pubkey: secp256k1::PublicKey) -> (Address, bool) {
 
 pub fn get_transaction(raw_tx: &str) -> ethers::types::Transaction {
     let bytes = &hex::decode(raw_tx).unwrap();
-    let tx = ethers::utils::rlp::decode::<ethers::types::Transaction>(bytes).unwrap();
-    tx
+    ethers::utils::rlp::decode::<ethers::types::Transaction>(bytes).unwrap()
 }
 
 pub fn get_typed_transaction(tx: &ethers::types::Transaction) -> ethers::types::transaction::eip2718::TypedTransaction {
@@ -122,7 +121,7 @@ mod tests {
         let addr_str = format!("{:?}", addr);
 
         assert_eq!(addr_str, expected_addr_str);
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     #[test]
@@ -146,7 +145,7 @@ mod tests {
         let addr_str = format!("{:?}", addr);
 
         assert_eq!(addr_str, expected_addr_str);
-        assert_eq!(is_valid, true);
+        assert!(is_valid);
     }
 
     #[test]
@@ -160,7 +159,7 @@ mod tests {
         let zero_bigint = U256::zero();
         let gas_limit = typedtx.gas().unwrap_or(&zero_bigint);
         assert_eq!(base_fee, U256::from(21000));
-        assert_eq!(gas_limit.as_u128(), 21000 as u128);
+        assert_eq!(gas_limit.as_u128(), 21000);
     }
 
     #[test]
@@ -175,7 +174,7 @@ mod tests {
 
         let valid = base_fee.as_u128() < gas_limit.as_u128();
 
-        assert_eq!(true, valid);
+        assert!(valid);
         assert_eq!(gas_limit.as_u128(), U256::from(3000000).as_u128());
     }
 }
