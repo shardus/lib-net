@@ -92,7 +92,7 @@ export const Sn = (opts: SnOpts) => {
   ) => {
     const res = await _sendAug(port, address, augData, timeout, onResponse, onTimeout, optionalHeader)
     if (!res.success) {
-      console.log(`_wrappedSendAug: request id ${augData.UUID}: failed with error ${res.error}`)
+      /* prettier-ignore */ if(logFlags.net_verbose) console.log(`_wrappedSendAug: request id ${augData.UUID}: failed with error ${res.error}`)
       throw new Error(res.error)
     }
   }
