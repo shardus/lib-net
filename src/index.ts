@@ -78,6 +78,25 @@ export const Sn = (opts: SnOpts) => {
 
   const retainTimedOutEntriesForMillis = 1000 * 60
 
+  const _wrappedSendAug = async (
+    port: number,
+    address: string,
+    augData: AugmentedData,
+    timeout: number,
+    onResponse: ResponseCallback,
+    onTimeout: TimeoutCallback,
+    optionalHeader?: {
+      version: number
+      headerData: CombinedHeader
+    }
+  ) => {
+    const res = await _sendAug(port, address, augData, timeout, onResponse, onTimeout, optionalHeader)
+    if (!res.success) {
+      console.log(`_wrappedSendAug: request id ${augData.UUID}: failed with error ${res.error}`)
+      throw new Error(res.error)
+    }
+  }
+
   /**
    * This sends our data the that is wrapped in an augData structure
    * a new function will be added similar to this one to send data with header
@@ -87,6 +106,7 @@ export const Sn = (opts: SnOpts) => {
    * @param timeout
    * @param onResponse
    * @param onTimeout
+   * @param optionalHeader
    * @returns
    */
   const _sendAug = async (
@@ -108,12 +128,12 @@ export const Sn = (opts: SnOpts) => {
 
     /* prettier-ignore */ if(logFlags.net_verbose) logMessageInfo(augData, stringifiedData)
 
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<{ success: boolean; error?: string }>((resolve, reject) => {
       const sendCallback = (error) => {
         if (error) {
-          reject(error)
+          resolve({ success: false, error })
         } else {
-          resolve()
+          resolve({ success: true })
         }
       }
       if (optionalHeader && stringifiedHeader !== null) {
@@ -198,7 +218,7 @@ export const Sn = (opts: SnOpts) => {
       compression: header.compression,
     }
 
-    return _sendAug(port, address, augData, timeout, onResponse, onTimeout, {
+    return _wrappedSendAug(port, address, augData, timeout, onResponse, onTimeout, {
       version: HEADER_OPTS.sendHeaderVersion,
       headerData: combinedHeader,
     })
@@ -221,7 +241,7 @@ export const Sn = (opts: SnOpts) => {
 
     const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
 
-    return _sendAug(port, address, augData, timeout, onResponse, onTimeout)
+    return _wrappedSendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
 
   const listen = async (
@@ -287,7 +307,7 @@ export const Sn = (opts: SnOpts) => {
 
         //@ts-ignore TODO: FIX THISSSSSS (Remove the ignore flag and make typescript not complain about address being possibly undefined)
         // @TODO: This error should be properly propagated and logged.
-        return _sendAug(PORT, address, sendData, 0, noop, noop, {
+        return _wrappedSendAug(PORT, address, sendData, 0, noop, noop, {
           version: HEADER_OPTS.sendHeaderVersion,
           headerData: combinedHeader,
         }).catch(console.error)
