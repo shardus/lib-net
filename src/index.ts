@@ -343,28 +343,32 @@ export const Sn = (opts: SnOpts) => {
     // and doesn't save hardly any startup time, so skipping for now.
     // const server = await _net.listen(PORT, ADDRESS, extractUUIDHandleData)
     const server = await _net.listen((data, remoteIp, remotePort, headerVersion?, headerData?, signData?) => {
-      if (headerVersion && headerData && signData) {
-        /* prettier-ignore */ if(logFlags.net_verbose) console.log(`received with header version: ${headerVersion}`)
-        const header: AppHeader = JSON.parse(headerData)
-        /* prettier-ignore */ if(logFlags.net_verbose) console.log(`received with header: ${JSON.stringify(header)}`)
-        /* prettier-ignore */ if(logFlags.net_verbose) console.log(`received with sign: ${signData}`)
-        const sign: Sign = JSON.parse(signData)
-        extractUUIDHandleData(
-          data,
-          {
-            address: remoteIp,
-            port: remotePort,
-          },
-          header,
-          sign
-        )
-        return
-      }
+      try {
+        if (headerVersion && headerData && signData) {
+          /* prettier-ignore */ if (logFlags.net_verbose) console.log(`received with header version: ${headerVersion}`)
+          const header: AppHeader = JSON.parse(headerData)
+          /* prettier-ignore */ if (logFlags.net_verbose) console.log(`received with header: ${JSON.stringify(header)}`)
+          /* prettier-ignore */ if (logFlags.net_verbose) console.log(`received with sign: ${signData}`)
+          const sign: Sign = JSON.parse(signData)
+          extractUUIDHandleData(
+            data,
+            {
+              address: remoteIp,
+              port: remotePort,
+            },
+            header,
+            sign
+          )
+          return
+        }
 
-      extractUUIDHandleData(data, {
-        address: remoteIp,
-        port: remotePort,
-      })
+        extractUUIDHandleData(data, {
+          address: remoteIp,
+          port: remotePort,
+        })
+      } catch (e) {
+        console.error("Error in shardus-net's listen callback:", e)
+      }
     })
 
     return server
