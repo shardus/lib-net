@@ -300,10 +300,10 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
     let header_js_string: String = cx.argument::<JsString>(3)?.value(cx) as String;
     let data_js_string: String = cx.argument::<JsString>(4)?.value(cx) as String;
     let complete_cb = cx.argument::<JsFunction>(5)?.root(cx);
-    let await_processing = cx.argument::<JsBoolean>(6)?.value(cx);
+    let await_processing = cx.argument::<JsBoolean>(6)?.value(cx); // this flag lets us skip the processing on the stats and the callback
 
-    let shardus_net_sender = cx.this().get(cx, "_sender")?.downcast_or_throw::<JsBox<Arc<ShardusNetSender>>, _>(cx)?;
-    let stats_incrementers = cx.this().get(cx, "_stats_incrementers")?.downcast_or_throw::<JsBox<Incrementers>, _>(cx)?;
+    let shardus_net_sender = cx.this().get::<JsBox<Arc<ShardusNetSender>>, _, _>(cx, "_sender")?;
+    let stats_incrementers = cx.this().get::<JsBox<Incrementers>, _, _>(cx, "_stats_incrementers")?;
 
     let this = cx.this().root(cx);
     let channel = cx.channel();
@@ -312,25 +312,33 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
 
     let header = match header_from_json_string(&header_js_string, &header_version) {
         Some(header) => header,
-        None => return cx.throw_error("Failed to parse header"),
+        None => {
+            // Throw a JavaScript error if header is None
+            return cx.throw_error("Failed to parse header");
+        }
     };
 
     let data = data_js_string.into_bytes().to_vec();
 
     // Create oneshot channels for each host-port pair
-    let mut senders = Vec::with_capacity(hosts.len());
-    let mut receivers = Vec::with_capacity(hosts.len());
+    let mut senders = Vec::with_capacity(hosts.len()); 
+    let mut receivers = Vec::with_capacity(hosts.len()); 
+
+    // should a check be added to see if ports.len == hosts.len
     for _ in 0..hosts.len() {
         let (sender, receiver) = oneshot::channel::<SendResult>();
         senders.push(sender);
         receivers.push(receiver);
     }
 
+    let complete_cb = Arc::new(complete_cb);
+    let this = Arc::new(this);
+
     // Handle the responses asynchronously
     for receiver in receivers {
         let channel = channel.clone();
-        let this = this.clone(cx);
-        let complete_cb = complete_cb.clone(cx);
+        let complete_cb = complete_cb.clone();
+        let this = this.clone();
 
         RUNTIME.spawn(async move {
             let result = receiver.await.expect("Complete send tx dropped before notify");
@@ -339,18 +347,17 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
                 RUNTIME.spawn_blocking(move || {
                     channel.send(move |mut cx| {
                         let cx = &mut cx;
-                        let stats = this.to_inner(cx).get(cx, "_stats")?.downcast_or_throw::<JsBox<RefCell<Stats>>, _>(cx)?;
+                        let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
                         (**stats).borrow_mut().decrement_outstanding_sends();
 
                         let this = cx.undefined();
-                        let mut args = Vec::new();
-
+                        
                         if let Err(err) = result {
                             let error = cx.string(format!("{:?}", err));
-                            args.push(error);
+                            complete_cb.to_inner(cx).call(cx, this, [error.upcast()])?;
+                        } else {
+                            complete_cb.to_inner(cx).call(cx, this, [])?;
                         }
-
-                        complete_cb.to_inner(cx).call(cx, this, args)?;
 
                         Ok(())
                     });
@@ -362,7 +369,10 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
     let mut addresses = Vec::new();
     for (host, port) in hosts.iter().zip(ports.iter()) {
         match (host as &str, *port).to_socket_addrs() {
-            Ok(addr_iter) => addresses.extend(addr_iter),
+            Ok(mut addr_iter) =>{
+                let address = addr_iter.next().expect("Expected at least one address");
+                addresses.push(address);
+            } 
             Err(_) => return cx.throw_type_error(format!("The provided address {}:{} is not valid", host, port)),
         }
     }
