@@ -1,7 +1,7 @@
 use crate::header::header_types::RequestMetadata;
 use crate::header_factory::header_deserialize_factory;
 use crate::message::Message;
-use crate::shardus_crypto;
+use crate::{shardus_crypto, HEADER_SIZE_LIMIT_IN_BYTES};
 
 use super::runtime::RUNTIME;
 
@@ -111,6 +111,11 @@ impl ShardusNetListener {
 
                 let mut cursor = Cursor::new(msg_bytes.to_vec());
                 let message = Message::deserialize(&mut cursor).expect("Failed to deserialize message");
+
+                if message.header.len() > HEADER_SIZE_LIMIT_IN_BYTES {
+                    error!("Header exceeds the limit of {} bytes", HEADER_SIZE_LIMIT_IN_BYTES);
+                    continue;
+                }
 
                 if !message.verify(shardus_crypto::get_shardus_crypto_instance()) {
                     error!("Failed to verify message signature");

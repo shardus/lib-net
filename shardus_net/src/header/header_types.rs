@@ -1,4 +1,4 @@
-use crate::compression::Compression;
+use crate::{compression::Compression, ENABLE_COMPRESSION};
 
 use super::header_v1::HeaderV1;
 
@@ -32,12 +32,18 @@ impl Header {
     }
 
     pub fn compress(&self, message: Vec<u8>) -> Vec<u8> {
+        if ENABLE_COMPRESSION == false {
+            return message;
+        }
         match self {
             Header::V1(header_v1) => header_v1.compression.compress(&message),
         }
     }
 
     pub fn decompress(&self, message: &[u8]) -> Option<Vec<u8>> {
+        if ENABLE_COMPRESSION == false {
+            return Some(message.to_vec());
+        }
         match self {
             Header::V1(header_v1) => header_v1.compression.decompress(message),
         }

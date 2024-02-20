@@ -37,6 +37,9 @@ use tokio::sync::Mutex;
 
 use crate::shardus_net_sender::Connection;
 
+const ENABLE_COMPRESSION: bool = false;
+const HEADER_SIZE_LIMIT_IN_BYTES: usize = 2 * 2048; // 2KB
+
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
 
