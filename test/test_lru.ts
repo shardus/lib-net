@@ -58,6 +58,7 @@ const main = async () => {
         '127.0.0.1',
         { message, fromPort: +port },
         {
+          compression: 'Brotli',
           sender_id: 'test',
         },
         1000,
@@ -81,8 +82,14 @@ const main = async () => {
   sn.listen(async (data: any, remote, respond, header, sign) => {
     if (data && data.message === 'ping') {
       console.log('Received ping from:', data.fromPort)
+      console.log('Ping header:', JSON.stringify(header, null, 2))
       // await sleep(10000)
-      return respond({ message: 'pong', fromPort: +port })
+      return respond(
+        { message: 'pong', fromPort: +port },
+        {
+          compression: 'Brotli',
+        }
+      )
     }
     if (data && data.message === 'pong') {
       console.log('Received pong from:', data.fromPort)
