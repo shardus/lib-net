@@ -32,7 +32,7 @@ impl Header {
     }
 
     pub fn compress(&self, message: Vec<u8>) -> Vec<u8> {
-        if ENABLE_COMPRESSION == false {
+        if !ENABLE_COMPRESSION {
             return message;
         }
         match self {
@@ -41,7 +41,7 @@ impl Header {
     }
 
     pub fn decompress(&self, message: &[u8]) -> Option<Vec<u8>> {
-        if ENABLE_COMPRESSION == false {
+        if !ENABLE_COMPRESSION {
             return Some(message.to_vec());
         }
         match self {
