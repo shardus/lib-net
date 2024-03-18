@@ -422,11 +422,12 @@ fn set_logging_enabled(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
-fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
+fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsArray> {
     let cx = &mut cx;
     let raw_tx = cx.argument::<JsString>(0)?.value(cx);
     let tx = shardeum_utils::get_transaction(&raw_tx);
     let typed_tx = shardeum_utils::get_typed_transaction(&tx);
+
 
     let sighash = typed_tx.sighash();
     let v = tx.v.as_u64();
@@ -443,8 +444,9 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
 
     let (addr, is_valid) = shardeum_utils::pub_to_addr(pubkey);
 
-    let result = cx.empty_object();
+
     let js_addr = cx.string(format!("{:?}", addr));
+    let js_return_array = cx.empty_array();
 
     let base_fee = shardeum_utils::get_base_fee(&typed_tx);
     let binding_fee = shardeum_utils::zero_bigint();
@@ -454,10 +456,12 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
     let gas_valid = gas_limit.ge(&base_fee);
 
     let js_is_valid = cx.boolean(is_valid & gas_valid);
-    result.set(cx, "address", js_addr)?;
-    result.set(cx, "isValid", js_is_valid)?;
+    // result.set(cx, "address", js_addr)?;
+    // result.set(cx, "isValid", js_is_valid)?;
+    js_return_array.set(cx, 0, js_addr)?;
+    js_return_array.set(cx, 1, js_is_valid)?;
 
-    Ok(result)
+    Ok(js_return_array)
 }
 
 #[neon::main]

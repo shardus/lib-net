@@ -2,7 +2,7 @@ extern crate ethers;
 extern crate hex;
 extern crate secp256k1;
 
-use ethers::types::{Address, H256, U256};
+use ethers::types::{Address, H256, U256, transaction::eip2718::TypedTransaction};
 use sha3::{Digest, Keccak256};
 
 pub fn ecrecover(sig_hash: H256, v: u64, r: U256, s: U256, chainid: Option<U256>) -> Result<secp256k1::PublicKey, secp256k1::Error> {
