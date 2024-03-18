@@ -174,6 +174,7 @@ export const Sn = (opts: SnOpts) => {
         }
       } else {
         if (Array.isArray(port) && Array.isArray(address)) {
+          /* prettier-ignore */ if(logFlags.net_verbose) console.log('multi sending without header')
           _net.multi_send(port, address, stringifiedData, sendCallback, awaitProcessing)
         } else {
           /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
@@ -330,7 +331,7 @@ export const Sn = (opts: SnOpts) => {
     return _wrappedSendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
 
-  const multi_send = async (
+  const multiSend = async (
     ports: number[], // Array of port numbers
     addresses: string[], // Array of IP addresses
     data: unknown,
@@ -529,7 +530,7 @@ export const Sn = (opts: SnOpts) => {
 
   const returnVal = {
     send,
-    multi_send,
+    multiSend,
     sendWithHeader,
     multiSendWithHeader,
     listen,
