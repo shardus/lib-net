@@ -60,6 +60,15 @@ impl ShardusNetSender {
             .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
     }
 
+    pub fn multi_send(&self, addresses: Vec<SocketAddr>, data: String, senders: Vec<Sender<SendResult>>) {
+        let data = data.into_bytes();
+        for (address, sender) in addresses.into_iter().zip(senders.into_iter()) {
+            self.send_channel
+                .send((address, data.clone(), sender))
+                .expect("Failed to send data with header to channel");
+        }
+    }
+
     // send_with_header: send data to a socket address with a header and signature
     pub fn send_with_header(&self, address: SocketAddr, header_version: u8, mut header: Header, data: Vec<u8>, complete_tx: Sender<SendResult>) {
         let compressed_data = header.compress(data);

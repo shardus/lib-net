@@ -79,8 +79,8 @@ export const Sn = (opts: SnOpts) => {
   const retainTimedOutEntriesForMillis = 1000 * 60
 
   const _wrappedSendAug = async (
-    port: number,
-    address: string,
+    port: number | number[],
+    address: string | string[],
     augData: AugmentedData,
     timeout: number,
     onResponse: ResponseCallback,
@@ -88,9 +88,19 @@ export const Sn = (opts: SnOpts) => {
     optionalHeader?: {
       version: number
       headerData: CombinedHeader
-    }
+    },
+    awaitProcessing?: boolean
   ) => {
-    const res = await _sendAug(port, address, augData, timeout, onResponse, onTimeout, optionalHeader)
+    const res = await _sendAug(
+      port,
+      address,
+      augData,
+      timeout,
+      onResponse,
+      onTimeout,
+      optionalHeader,
+      awaitProcessing
+    )
     if (!res.success) {
       /* prettier-ignore */ if(logFlags.net_verbose) console.log(`_wrappedSendAug: request id ${augData.UUID}: failed with error ${res.error}`)
       throw new Error(res.error)
@@ -163,8 +173,12 @@ export const Sn = (opts: SnOpts) => {
           )
         }
       } else {
-        /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
-        _net.send(port, address, stringifiedData, sendCallback)
+        if (Array.isArray(port) && Array.isArray(address)) {
+          _net.multi_send(port, address, stringifiedData, sendCallback, awaitProcessing)
+        } else {
+          /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
+          _net.send(port, address, stringifiedData, sendCallback)
+        }
       }
 
       // a timeout of 0 means no return message is expected.
@@ -249,7 +263,7 @@ export const Sn = (opts: SnOpts) => {
       compression: header.compression,
     }
 
-    return _sendAug(
+    return _wrappedSendAug(
       ports,
       addresses,
       augData,
@@ -314,6 +328,26 @@ export const Sn = (opts: SnOpts) => {
     const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
 
     return _wrappedSendAug(port, address, augData, timeout, onResponse, onTimeout)
+  }
+
+  const multi_send = async (
+    ports: number[], // Array of port numbers
+    addresses: string[], // Array of IP addresses
+    data: unknown,
+    timeout = 0,
+    onResponse: ResponseCallback = noop,
+    onTimeout: TimeoutCallback = noop
+  ) => {
+    const UUID = uuid()
+
+    let msgDir: 'ask' | 'tell' = 'ask'
+    if (onResponse === noop) {
+      msgDir = 'tell'
+    }
+
+    const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
+
+    return _wrappedSendAug(ports, addresses, augData, timeout, onResponse, onTimeout)
   }
 
   const listen = async (
@@ -495,6 +529,7 @@ export const Sn = (opts: SnOpts) => {
 
   const returnVal = {
     send,
+    multi_send,
     sendWithHeader,
     multiSendWithHeader,
     listen,
