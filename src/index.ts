@@ -88,12 +88,31 @@ export const Sn = (opts: SnOpts) => {
     optionalHeader?: {
       version: number
       headerData: CombinedHeader
-    }
+    },
+    awaitProcessing: boolean = true
   ) => {
-    const res = await _sendAug(port, address, augData, timeout, onResponse, onTimeout, optionalHeader)
-    if (!res.success) {
-      /* prettier-ignore */ if(logFlags.net_verbose) console.log(`_wrappedSendAug: request id ${augData.UUID}: failed with error ${res.error}`)
-      throw new Error(res.error)
+    try {
+      const res = await _sendAug(
+        port,
+        address,
+        augData,
+        timeout,
+        onResponse,
+        onTimeout,
+        optionalHeader,
+        awaitProcessing
+      )
+      if (!res.success) {
+        const errorMsg = `_wrappedSendAug: request id ${augData.UUID}: failed with error ${res.error}`
+        console.error(errorMsg)
+        throw new Error(errorMsg)
+      }
+    } catch (err: unknown) {
+      // Ensure any kind of error is caught and logged
+      if (err instanceof Error) {
+        console.error(`Error in _wrappedSendAug: ${err.message}`)
+      }
+      throw err // Rethrow after logging or handle accordingly
     }
   }
 
@@ -137,34 +156,38 @@ export const Sn = (opts: SnOpts) => {
           resolve({ success: true })
         }
       }
-      if (optionalHeader && stringifiedHeader !== null) {
-        /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
-        // if it is a multi send operation, from shardus-core, array of ports and addresses shall be sent.
-        if (Array.isArray(port) && Array.isArray(address)) {
-          if (logFlags.net_verbose) console.log('multi_send_with_header')
-          _net.multi_send_with_header(
-            port,
-            address,
-            optionalHeader.version,
-            stringifiedHeader,
-            stringifiedData,
-            sendCallback,
-            awaitProcessing
-          )
-        } else {
-          if (logFlags.net_verbose) console.log('send_with_header')
-          _net.send_with_header(
-            port,
-            address,
-            optionalHeader.version,
-            stringifiedHeader,
-            stringifiedData,
-            sendCallback
-          )
+      try {
+        if (optionalHeader && stringifiedHeader !== null) {
+          /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
+          // if it is a multi send operation, from shardus-core, array of ports and addresses shall be sent.
+          if (Array.isArray(port) && Array.isArray(address)) {
+            if (logFlags.net_verbose) console.log('multi_send_with_header')
+            _net.multi_send_with_header(
+              port,
+              address,
+              optionalHeader.version,
+              stringifiedHeader,
+              stringifiedData,
+              sendCallback,
+              awaitProcessing
+            )
+          } else {
+            if (logFlags.net_verbose) console.log('send_with_header')
+            _net.send_with_header(
+              port,
+              address,
+              optionalHeader.version,
+              stringifiedHeader,
+              stringifiedData,
+              sendCallback
+            )
+          }
+        } else{
+          /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
+          _net.send(port, address, stringifiedData, sendCallback)
         }
-      } else {
-        /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
-        _net.send(port, address, stringifiedData, sendCallback)
+      } catch (error) {
+        console.log('error sending from ts side of shardus-net', error)
       }
 
       // a timeout of 0 means no return message is expected.
@@ -232,27 +255,40 @@ export const Sn = (opts: SnOpts) => {
     onTimeout: TimeoutCallback = noop,
     awaitProcessing: boolean = true
   ) => {
-    const UUID = uuid()
+    try {
+      const UUID = uuid()
 
-    let msgDir: 'ask' | 'tell' = 'ask'
-    if (onResponse === noop) {
-      msgDir = 'tell'
+      let msgDir: 'ask' | 'tell' = 'ask'
+      if (onResponse === noop) {
+        msgDir = 'tell'
+      }
+
+      const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
+
+      const combinedHeader: CombinedHeader = {
+        uuid: UUID,
+        sender_id: header.sender_id,
+        tracker_id: header.tracker_id,
+        verification_data: header.verification_data,
+        compression: header.compression,
+      }
+
+      return _wrappedSendAug(
+        ports,
+        addresses,
+        augData,
+        timeout,
+        onResponse,
+        onTimeout,
+        {
+          version: HEADER_OPTS.sendHeaderVersion,
+          headerData: combinedHeader,
+        },
+        awaitProcessing
+      )
+    } catch (error) {
+      console.log('multiSendWithHeader - error sending from ts side of shardus-net', error)
     }
-
-    const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
-
-    const combinedHeader: CombinedHeader = {
-      uuid: UUID,
-      sender_id: header.sender_id,
-      tracker_id: header.tracker_id,
-      verification_data: header.verification_data,
-      compression: header.compression,
-    }
-
-    return _wrappedSendAug(ports, addresses, augData, timeout, onResponse, onTimeout, {
-      version: HEADER_OPTS.sendHeaderVersion,
-      headerData: combinedHeader,
-    })
   }
 
   const sendWithHeader = async (
