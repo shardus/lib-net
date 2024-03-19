@@ -89,21 +89,30 @@ export const Sn = (opts: SnOpts) => {
       version: number
       headerData: CombinedHeader
     },
-    awaitProcessing?: boolean
+    awaitProcessing: boolean = true
   ) => {
-    const res = await _sendAug(
-      port,
-      address,
-      augData,
-      timeout,
-      onResponse,
-      onTimeout,
-      optionalHeader,
-      awaitProcessing
-    )
-    if (!res.success) {
-      /* prettier-ignore */ if(logFlags.net_verbose) console.log(`_wrappedSendAug: request id ${augData.UUID}: failed with error ${res.error}`)
-      throw new Error(res.error)
+    try {
+      const res = await _sendAug(
+        port,
+        address,
+        augData,
+        timeout,
+        onResponse,
+        onTimeout,
+        optionalHeader,
+        awaitProcessing
+      )
+      if (!res.success) {
+        const errorMsg = `_wrappedSendAug: request id ${augData.UUID}: failed with error ${res.error}`
+        console.error(errorMsg)
+        throw new Error(errorMsg)
+      }
+    } catch (err: unknown) {
+      // Ensure any kind of error is caught and logged
+      if (err instanceof Error) {
+        console.error(`Error in _wrappedSendAug: ${err.message}`)
+      }
+      throw err // Rethrow after logging or handle accordingly
     }
   }
 
@@ -130,7 +139,7 @@ export const Sn = (opts: SnOpts) => {
       version: number
       headerData: CombinedHeader
     },
-    awaitProcessing?: boolean
+    awaitProcessing: boolean = false
   ) => {
     const stringifiedData = stringifyData(augData, opts.customStringifier)
     const stringifiedHeader = optionalHeader
@@ -147,39 +156,50 @@ export const Sn = (opts: SnOpts) => {
           resolve({ success: true })
         }
       }
-      if (optionalHeader && stringifiedHeader !== null) {
-        /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
-        // if it is a multi send operation, from shardus-core, array of ports and addresses shall be sent.
-        if (Array.isArray(port) && Array.isArray(address)) {
-          if (logFlags.net_verbose) console.log('multi_send_with_header')
-          _net.multi_send_with_header(
-            port,
-            address,
-            optionalHeader.version,
-            stringifiedHeader,
-            stringifiedData,
-            sendCallback,
-            awaitProcessing
-          )
+      try {
+        if (optionalHeader && stringifiedHeader !== null) {
+          /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
+          // if it is a multi send operation, from shardus-core, array of ports and addresses shall be sent.
+          if (Array.isArray(port) && Array.isArray(address)) {
+            if (logFlags.net_verbose) console.log('multi_send_with_header')
+            _net.multi_send_with_header(
+              port,
+              address,
+              optionalHeader.version,
+              stringifiedHeader,
+              stringifiedData,
+              sendCallback,
+              awaitProcessing
+            )
+          } else {
+            if (logFlags.net_verbose) console.log('send_with_header')
+            _net.send_with_header(
+              port,
+              address,
+              optionalHeader.version,
+              stringifiedHeader,
+              stringifiedData,
+              sendCallback
+            )
+          }
         } else {
-          if (logFlags.net_verbose) console.log('send_with_header')
-          _net.send_with_header(
-            port,
-            address,
-            optionalHeader.version,
-            stringifiedHeader,
-            stringifiedData,
-            sendCallback
-          )
+          if (Array.isArray(port) && Array.isArray(address)) {
+            console.log(
+              'the ports and addresses shall be sent are',
+              port,
+              address,
+              stringifiedData,
+              awaitProcessing
+            )
+            console.log('multi sending without header')
+            _net.multi_send(port, address, stringifiedData, sendCallback, awaitProcessing)
+          } else {
+            /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
+            _net.send(port, address, stringifiedData, sendCallback)
+          }
         }
-      } else {
-        if (Array.isArray(port) && Array.isArray(address)) {
-          /* prettier-ignore */ if(logFlags.net_verbose) console.log('multi sending without header')
-          _net.multi_send(port, address, stringifiedData, sendCallback, awaitProcessing)
-        } else {
-          /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
-          _net.send(port, address, stringifiedData, sendCallback)
-        }
+      } catch (error) {
+        console.log('error sending from ts side of shardus-net', error)
       }
 
       // a timeout of 0 means no return message is expected.
@@ -339,16 +359,22 @@ export const Sn = (opts: SnOpts) => {
     onResponse: ResponseCallback = noop,
     onTimeout: TimeoutCallback = noop
   ) => {
-    const UUID = uuid()
+    try {
+      const UUID = uuid()
 
-    let msgDir: 'ask' | 'tell' = 'ask'
-    if (onResponse === noop) {
-      msgDir = 'tell'
+      let msgDir: 'ask' | 'tell' = 'ask'
+      if (onResponse === noop) {
+        msgDir = 'tell'
+      }
+
+      const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
+
+      return _wrappedSendAug(ports, addresses, augData, timeout, onResponse, onTimeout)
+    } catch (error) {
+      console.error(`Error in multiSend non binary: ${error}`)
+      // Depending on your use case, rethrow the error or handle it
+      throw error // For example, to allow the caller to handle it
     }
-
-    const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
-
-    return _wrappedSendAug(ports, addresses, augData, timeout, onResponse, onTimeout)
   }
 
   const listen = async (

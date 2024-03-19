@@ -61,12 +61,16 @@ impl ShardusNetSender {
     }
 
     pub fn multi_send(&self, addresses: Vec<SocketAddr>, data: String, senders: Vec<Sender<SendResult>>) {
+        log::info!("Entering the final stage of multi-send");
+    
         let data = data.into_bytes();
+    
         for (address, sender) in addresses.into_iter().zip(senders.into_iter()) {
             self.send_channel
                 .send((address, data.clone(), sender))
-                .expect("Failed to send data with header to channel");
+                .unwrap_or_else(|e| println!("Failed to send data: {}", e));
         }
+        // Error handling improved by logging the error instead of expecting and possibly panicking.
     }
 
     // send_with_header: send data to a socket address with a header and signature
