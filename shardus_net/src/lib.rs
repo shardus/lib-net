@@ -308,7 +308,9 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
     let this = cx.this().root(cx);
     let channel = cx.channel();
 
-    stats_incrementers.increment_outstanding_sends();
+    for _ in 0..ports.len() {
+        stats_incrementers.increment_outstanding_sends();
+    }
 
     let header = match header_from_json_string(&header_js_string, &header_version) {
         Some(header) => header,
@@ -321,8 +323,8 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
     let data = data_js_string.into_bytes().to_vec();
 
     // Create oneshot channels for each host-port pair
-    let mut senders = Vec::with_capacity(hosts.len()); 
-    let mut receivers = Vec::with_capacity(hosts.len()); 
+    let mut senders = Vec::with_capacity(hosts.len());
+    let mut receivers = Vec::with_capacity(hosts.len());
 
     // should a check be added to see if ports.len == hosts.len
     for _ in 0..hosts.len() {
@@ -351,7 +353,7 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
                         (**stats).borrow_mut().decrement_outstanding_sends();
 
                         let this = cx.undefined();
-                        
+
                         if let Err(err) = result {
                             let error = cx.string(format!("{:?}", err));
                             complete_cb.to_inner(cx).call(cx, this, [error.upcast()])?;
@@ -369,10 +371,10 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
     let mut addresses = Vec::new();
     for (host, port) in hosts.iter().zip(ports.iter()) {
         match (host as &str, *port).to_socket_addrs() {
-            Ok(mut addr_iter) =>{
+            Ok(mut addr_iter) => {
                 let address = addr_iter.next().expect("Expected at least one address");
                 addresses.push(address);
-            } 
+            }
             Err(_) => return cx.throw_type_error(format!("The provided address {}:{} is not valid", host, port)),
         }
     }
