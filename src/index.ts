@@ -139,7 +139,7 @@ export const Sn = (opts: SnOpts) => {
       version: number
       headerData: CombinedHeader
     },
-    awaitProcessing: boolean = false
+    awaitProcessing: boolean = true
   ) => {
     const stringifiedData = stringifyData(augData, opts.customStringifier)
     const stringifiedHeader = optionalHeader
