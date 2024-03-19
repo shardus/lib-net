@@ -187,7 +187,8 @@ export const Sn = (opts: SnOpts) => {
           _net.send(port, address, stringifiedData, sendCallback)
         }
       } catch (error) {
-        console.log('error sending from ts side of shardus-net', error)
+        console.log('_sendAug - error sending from ts side of shardus-net', error)
+        throw error
       }
 
       // a timeout of 0 means no return message is expected.
@@ -288,6 +289,7 @@ export const Sn = (opts: SnOpts) => {
       )
     } catch (error) {
       console.log('multiSendWithHeader - error sending from ts side of shardus-net', error)
+      throw error
     }
   }
 
