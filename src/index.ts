@@ -79,8 +79,8 @@ export const Sn = (opts: SnOpts) => {
   const retainTimedOutEntriesForMillis = 1000 * 60
 
   const _wrappedSendAug = async (
-    port: number,
-    address: string,
+    port: number | number[],
+    address: string | string[],
     augData: AugmentedData,
     timeout: number,
     onResponse: ResponseCallback,
@@ -120,7 +120,7 @@ export const Sn = (opts: SnOpts) => {
       version: number
       headerData: CombinedHeader
     },
-    awaitProcessing?: boolean
+    awaitProcessing: boolean = true
   ) => {
     const stringifiedData = stringifyData(augData, opts.customStringifier)
     const stringifiedHeader = optionalHeader
@@ -249,19 +249,10 @@ export const Sn = (opts: SnOpts) => {
       compression: header.compression,
     }
 
-    return _sendAug(
-      ports,
-      addresses,
-      augData,
-      timeout,
-      onResponse,
-      onTimeout,
-      {
-        version: HEADER_OPTS.sendHeaderVersion,
-        headerData: combinedHeader,
-      },
-      awaitProcessing
-    )
+    return _wrappedSendAug(ports, addresses, augData, timeout, onResponse, onTimeout, {
+      version: HEADER_OPTS.sendHeaderVersion,
+      headerData: combinedHeader,
+    })
   }
 
   const sendWithHeader = async (
