@@ -393,7 +393,7 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
 }
 
 pub fn multi_send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    println!("We have entered the channel for multi-send");
+    
     let cx = &mut cx;
 
     let ports_js_array = cx.argument::<JsArray>(0)?;
@@ -403,7 +403,7 @@ pub fn multi_send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         .map(|val| val.downcast::<JsNumber, _>(cx).or_throw(cx).map(|js_number| js_number.value(cx) as u16))
         .collect(); // Collects into a Result<Vec<u16>, _>
     let ports = ports_result?; // Handle error or unwrap the result
-    println!("The ports are {:?}", ports);
+   
 
     // Convert the JavaScript array of hosts to a Vec<String> in Rust
     let hosts_js_array = cx.argument::<JsArray>(1)?;
@@ -413,7 +413,7 @@ pub fn multi_send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         .map(|val| val.downcast::<JsString, _>(cx).or_throw(cx).map(|js_string| js_string.value(cx)))
         .collect(); // Collects into a Result<Vec<String>, _>
     let hosts = hosts_result?; // Handle error or unwrap the result
-    println!("The hosts are {:?}", hosts);
+   
 
     if ports.len() != hosts.len() {
         return cx.throw_error("The lengths of hosts and ports do not match");
@@ -422,7 +422,7 @@ pub fn multi_send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let data = cx.argument::<JsString>(2)?.value(cx);
     let complete_cb = cx.argument::<JsFunction>(3)?.root(cx);
     let await_processing = cx.argument::<JsBoolean>(4)?.value(cx); // this flag lets us skip the processing on the stats and the callback
-    print!("are we processing? {}", await_processing);
+    
     
 
     let shardus_net_sender = cx.this().get::<JsBox<Arc<ShardusNetSender>>, _, _>(cx, "_sender")?;
@@ -439,9 +439,6 @@ pub fn multi_send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let mut senders = Vec::with_capacity(hosts.len());
     let mut receivers = Vec::with_capacity(hosts.len());
 
-    // todo:
-    // should a check be added to see if ports.len == hosts.len
-
     for _ in 0..hosts.len() {
         let (sender, receiver) = oneshot::channel::<SendResult>();
         senders.push(sender);
@@ -450,8 +447,6 @@ pub fn multi_send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
     let complete_cb = Arc::new(complete_cb);
     let this = Arc::new(this);
-
-    println!("Looks like we reach here");
 
     // Handle the responses asynchronously
     for receiver in receivers {
@@ -485,8 +480,6 @@ pub fn multi_send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         });
     }
 
-    println!("Do we reach here?");
-
     let mut addresses = Vec::new();
     for (host, port) in hosts.iter().zip(ports.iter()) {
         match (host as &str, *port).to_socket_addrs() {
@@ -503,7 +496,6 @@ pub fn multi_send(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     }
 
     // Send each address with its corresponding sender
-    println!("Here are the addresses {:?}", addresses);
     shardus_net_sender.multi_send(addresses, data, senders);
 
     Ok(cx.undefined())

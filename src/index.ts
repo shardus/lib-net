@@ -184,14 +184,7 @@ export const Sn = (opts: SnOpts) => {
           }
         } else {
           if (Array.isArray(port) && Array.isArray(address)) {
-            console.log(
-              'the ports and addresses shall be sent are',
-              port,
-              address,
-              stringifiedData,
-              awaitProcessing
-            )
-            console.log('multi sending without header')
+            if (logFlags.net_verbose) console.log('multi sending without header')
             _net.multi_send(port, address, stringifiedData, sendCallback, awaitProcessing)
           } else {
             /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending without header')
