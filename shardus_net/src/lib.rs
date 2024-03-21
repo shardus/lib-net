@@ -346,7 +346,7 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
             let result = receiver.await.expect("Complete send tx dropped before notify");
 
             if await_processing {
-                RUNTIME.spawn_blocking(move || {
+                RUNTIME.spawn( async move  {
                     channel.send(move |mut cx| {
                         let cx = &mut cx;
                         let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
