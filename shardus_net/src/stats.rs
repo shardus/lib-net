@@ -2,7 +2,7 @@ use super::ring_buffer::{RingBuffer, Stats as RingBufferStats};
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     time::Duration,
 };
@@ -13,14 +13,14 @@ pub(crate) struct Stats {
     pub outstanding_sends_buffer: RingBuffer<usize>,
     pub outstanding_receives_buffer: RingBuffer<usize>,
     pub receive_elapsed_buffer: RingBuffer<Duration>,
-    outstanding_sends: Arc<AtomicUsize>,
-    outstanding_receives: Arc<AtomicUsize>,
+    outstanding_sends: Arc<Mutex<AtomicUsize>>,
+    outstanding_receives: Arc<Mutex<AtomicUsize>>,
 }
 
 impl Stats {
     pub(crate) fn new() -> (Self, Incrementers) {
-        let outstanding_sends = Arc::new(AtomicUsize::new(0));
-        let outstanding_receives = Arc::new(AtomicUsize::new(0));
+        let outstanding_sends = Arc::new(Mutex::new(AtomicUsize::new(0)));
+        let outstanding_receives = Arc::new(Mutex::new(AtomicUsize::new(0)));
 
         (
             Self {
@@ -38,13 +38,18 @@ impl Stats {
     }
 
     pub(crate) fn decrement_outstanding_sends(&mut self) {
-        let outstanding = self.outstanding_sends.fetch_sub(1, Ordering::Acquire) - 1;
-        self.outstanding_sends_buffer.put(outstanding);
+        let lock = self.outstanding_sends.lock().unwrap();
+        lock.fetch_add(1, Ordering::Relaxed);
     }
 
     pub(crate) fn decrement_outstanding_receives(&mut self) {
-        let outstanding = self.outstanding_receives.fetch_sub(1, Ordering::Acquire) - 1;
+
+        let lock = self.outstanding_receives.lock().unwrap();
+        let outstanding = lock.fetch_sub(1, Ordering::Acquire) - 1;
         self.outstanding_receives_buffer.put(outstanding);
+
+        // let outstanding = self.outstanding_receives.fetch_sub(1, Ordering::Acquire) - 1;
+        // self.outstanding_receives_buffer.put(outstanding);
     }
 
     pub(crate) fn put_elapsed_receive(&mut self, elapsed: Duration) {
@@ -62,17 +67,19 @@ impl Stats {
 
 #[derive(Clone)]
 pub(crate) struct Incrementers {
-    outstanding_sends: Arc<AtomicUsize>,
-    outstanding_receives: Arc<AtomicUsize>,
+    outstanding_sends: Arc<Mutex<AtomicUsize>>,
+    outstanding_receives: Arc<Mutex<AtomicUsize>>,
 }
 
 impl Incrementers {
     pub(crate) fn increment_outstanding_sends(&self) {
-        self.outstanding_sends.fetch_add(1, Ordering::Relaxed);
+        let lock = self.outstanding_sends.lock().unwrap();
+        lock.fetch_add(1, Ordering::Relaxed);
     }
 
     pub(crate) fn increment_outstanding_receives(&self) {
-        self.outstanding_receives.fetch_add(1, Ordering::Relaxed);
+        let lock = self.outstanding_receives.lock().unwrap();
+        lock.fetch_add(1, Ordering::Relaxed);
     }
 }
 

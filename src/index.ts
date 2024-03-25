@@ -343,6 +343,7 @@ export const Sn = (opts: SnOpts) => {
     }
 
     const augData: AugmentedData = NewAugData(data, UUID, PORT, ADDRESS, timeout, msgDir)
+    console.log("The augmented data in send request is", augData)
 
     return _wrappedSendAug(port, address, augData, timeout, onResponse, onTimeout)
   }
@@ -366,7 +367,9 @@ export const Sn = (opts: SnOpts) => {
       sign?: Sign
     ) => {
       // [TODO] Secure this with validation
+      console.log("extractUUIDHandleData instance A", augDataStr)
       let augData: AugmentedData = JSON.parse(augDataStr, base64BufferReviver)
+      console.log("extractUUIDHandleData instance B", augData)
 
       //here we will log the received message.  note we exploit an aspect of augData
       //that the data part is the first value and will be close enough to the start ot the string
@@ -426,6 +429,7 @@ export const Sn = (opts: SnOpts) => {
         const handle = responseUUIDMapping[UUID].callback
         // Clear the respond mechanism.
         delete responseUUIDMapping[UUID]
+        console.log("responseUUIDMapping data is", data)
         return handle(data, header, sign)
       } else {
         // check if the UUID is in the timedOutUUIDMapping

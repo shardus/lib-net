@@ -60,8 +60,14 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let (stats, stats_incrementers) = Stats::new();
     let shardus_net_listener = cx.boxed(shardus_net_listener);
     let shardus_net_sender = cx.boxed(shardus_net_sender);
+
     let stats = cx.boxed(RefCell::new(stats));
     let stats_incrementers = cx.boxed(stats_incrementers);
+
+    let mt_stats = Stats::new(); // added for multi thread safe practice : mutex
+    let mt_stats = cx.boxed(mt_stats.0);
+
+    // let mt_stats = Arc::new(Mutex::new(mt_stats.0);
 
     let shardus_net = cx.empty_object();
 
@@ -82,6 +88,7 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     shardus_net.set(cx, "multi_send_with_header", multi_send_with_header)?;
     shardus_net.set(cx, "evict_socket", evict_socket)?;
     shardus_net.set(cx, "stats", get_stats)?;
+    shardus_net.set(cx, "mt_stats", mt_stats)?;
 
     Ok(shardus_net)
 }
@@ -304,6 +311,7 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
 
     let shardus_net_sender = cx.this().get::<JsBox<Arc<ShardusNetSender>>, _, _>(cx, "_sender")?;
     let stats_incrementers = cx.this().get::<JsBox<Incrementers>, _, _>(cx, "_stats_incrementers")?;
+    let mt_stats = cx.this().get::<JsBox<Stats>, _, _>(cx, "mt_stats");
 
     let this = cx.this().root(cx);
     let channel = cx.channel();
@@ -344,27 +352,29 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
 
         RUNTIME.spawn(async move {
             let result = receiver.await.expect("Complete send tx dropped before notify");
+            // mt_stats.decrement_outstanding_sends();
+            // let mut stats_guard = mt_stats.lock().await.expect("Failed to lock mt_stats");
 
             if await_processing {
-                RUNTIME.spawn( async move  {
-                    channel.send(move |mut cx| {
-                        let cx = &mut cx;
-                        let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
-                        (**stats).borrow_mut().decrement_outstanding_sends();
+                channel.send(move |mut cx| {
+                    let cx = &mut cx;
 
-                        let this = cx.undefined();
+                    let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
+                    (**stats).borrow_mut().decrement_outstanding_sends();
 
-                        if let Err(err) = result {
-                            let error = cx.string(format!("{:?}", err));
-                            complete_cb.to_inner(cx).call(cx, this, [error.upcast()])?;
-                        } else {
-                            complete_cb.to_inner(cx).call(cx, this, [])?;
-                        }
+                    let this = cx.undefined();
 
-                        Ok(())
-                    });
+                    if let Err(err) = result {
+                        let error = cx.string(format!("{:?}", err));
+                        complete_cb.to_inner(cx).call(cx, this, [error.upcast()])?;
+                    } else {
+                        complete_cb.to_inner(cx).call(cx, this, [])?;
+                    }
+
+                    Ok(())
                 });
             }
+            
         });
     }
 
@@ -585,3 +595,26 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 
     Ok(())
 }
+
+/*
+idea 1 : implementing Mutex lock in create_shardus_net and accessing stats in multi_send_with_headers
+
+
+   - The Finalize trait in Neon's context plays a crucial role in managing the lifecycle of Rust data that is exposed to JavaScript through Neon bindings.
+   - The issue with Mutex and JsBox arises from the fact that JsBox requires the contained type to implement the Finalize trait.
+   - However, many Rust types, including std::sync::Mutex and tokio::sync::Mutex, do not implement the Finalize trait
+
+idea 2 : referencing stats variable from create_shardus_net and creating an Arc Mutex for it in multi_send_with_headers
+
+   // let mut stats_guard = mt_stats.lock().await.expect("Failed to lock mt_stats");
+
+   1. Within the child thread
+   - [E0277] `*mut napi::bindings::types::Value__` cannot be sent between threads safely.
+     due to the synchronous nature of the channel.send() method
+     The closure is executed synchronously with respect to Neon's event loop, meaning it must complete without yielding (awaiting on futures).
+     Neon's Synchronous Nature: The callback provided to channel.send() in Neon must execute synchronously. That is, it should not await any futures or perform asynchronous operations directly. This is because the execution model of Neon (and Node.js in general) assumes that callbacks complete their execution without yielding control back to the runtime through awaiting.
+
+   2. Outside the child thread but within the parent worker thread
+       const stats doesnt implement the send trait. In the context of Neon (a Rust binding for Node.js), JsBox is used to store Rust data inside a JavaScript object. However, JsBox is not designed to be sent across threads (Send) or accessed from multiple threads (Sync), as its lifecycle is managed by the V8 garbage collector, which runs on the main JavaScript thread.
+
+*/
