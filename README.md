@@ -6,9 +6,17 @@ Fundamentally, this is just a networked event emitter. Under the hood, the libra
 
 ## Installation
 
+You can install shardus net via npm:
+
 ```sh
 npm i gitlab:shardus/shardus-net
 ```
+
+## Local Development
+
+If you're working on the `shardus-net` package, make sure to run the command `npm run build` manually to ensure both TypeScript and Rust files are generated.
+
+For publishing a release to NPM, simply run `npm run release` command.
 
 ## Usage
 
@@ -97,15 +105,9 @@ const server = await sn.listen((data, remote, protocol, respond) => {
 await sn.stopListening(servers)
 ```
 
-## Developing
+## Contributing
 
-If you're trying to develop on the `shardus-net` package Be sure to run the `build` npm script by hand to ensure both TS and Rust files get made.
-
-If you're trying to publish a release to NPM, use the `release` npm script.
-
-## Contributors
+Contributions are very welcome! Everyone interacting in our codebases, issue trackers, and any other form of communication, including chat rooms and mailing lists, is expected to follow our [code of conduct](./CODE_OF_CONDUCT.md) so we can all enjoy the effort we put into this project.
 
 Special thanks to Aaron Sullivan (<aasullivan1618@gmail.com>) for the contributions that became the base for this library.
 You can find them here at <https://gitlab.com/Shardus/shardus-quic-net.git>
-
-All done. Enjoy!
