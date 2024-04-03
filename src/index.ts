@@ -141,7 +141,6 @@ export const Sn = (opts: SnOpts) => {
     },
     awaitProcessing: boolean = true
   ) => {
-    let timer
     const stringifiedData = stringifyData(augData, opts.customStringifier)
     const stringifiedHeader = optionalHeader
       ? stringifyData(optionalHeader.headerData, opts.customStringifier)
@@ -151,7 +150,6 @@ export const Sn = (opts: SnOpts) => {
 
     return new Promise<{ success: boolean; error?: string }>((resolve, reject) => {
       const sendCallback = (error) => {
-        clearTimeout(timer)
         if (error) {
           resolve({ success: false, error })
         } else {
@@ -195,7 +193,7 @@ export const Sn = (opts: SnOpts) => {
 
       // a timeout of 0 means no return message is expected.
       if (timeout !== 0) {
-        timer = setTimeout(() => {
+        const timer = setTimeout(() => {
           const mapping = responseUUIDMapping[augData.UUID]
           timedOutUUIDMapping.set(
             augData.UUID,
