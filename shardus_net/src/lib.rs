@@ -53,7 +53,8 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     shardus_crypto::initialize_shardus_crypto_instance(&hash_key);
 
     let hex_signing_sk = cx.argument::<JsString>(5)?.value(cx);
-    let key_pair = shardus_crypto::get_shardus_crypto_instance().get_key_pair_using_sk(&crypto::HexStringOrBuffer::Hex(hex_signing_sk));
+    let shardus_crypto_instance = shardus_crypto::get_shardus_crypto_instance();
+    let key_pair = shardus_crypto_instance.get_key_pair_using_sk(&crypto::HexStringOrBuffer::Hex(hex_signing_sk));
 
     let shardus_net_listener = create_shardus_net_listener(cx, port, host)?;
     let shardus_net_sender = create_shardus_net_sender(use_lru, NonZeroUsize::new(lru_size as usize).unwrap(), key_pair);
