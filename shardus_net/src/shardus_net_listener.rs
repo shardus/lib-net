@@ -117,7 +117,8 @@ impl ShardusNetListener {
                     continue;
                 }
 
-                if !message.verify(shardus_crypto::get_shardus_crypto_instance()) {
+                let shardus_crypto_instance = shardus_crypto::get_shardus_crypto_instance();
+                if !message.verify(&*shardus_crypto_instance) {
                     error!("Failed to verify message signature");
                     continue;
                 }
