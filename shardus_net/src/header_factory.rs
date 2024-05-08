@@ -3,11 +3,8 @@ use std::io::Cursor;
 use crate::header::header_types::Header;
 use crate::header::header_v1::HeaderV1;
 
-pub fn wrap_serialized_message(mut serialized_message: Vec<u8>) -> Vec<u8> {
-    let mut buffer = Vec::new();
-    buffer.push(1); // indicate that the header system is in use
-    buffer.append(&mut serialized_message);
-    buffer
+pub fn wrap_serialized_message(serialized_message: &mut Vec<u8>) {
+    serialized_message.insert(0, 1); // Prepend the byte directly to the original vector
 }
 
 pub fn header_deserialize_factory(version: u8, serialized_header_cursor: &mut Cursor<Vec<u8>>) -> Option<Header> {
