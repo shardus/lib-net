@@ -67,7 +67,8 @@ impl ShardusNetSender {
         let serialized_header = header_serialize_factory(header_version, header).expect("Failed to serialize header");
         let mut message = Message::new_unsigned(header_version, serialized_header, compressed_data);
         message.sign(shardus_crypto::get_shardus_crypto_instance(), &self.key_pair);
-        let serialized_message = wrap_serialized_message(message.serialize());
+        let mut serialized_message = message.serialize();
+        wrap_serialized_message(&mut serialized_message);
         self.send_channel
             .send((address, serialized_message, complete_tx))
             .expect("Unexpected! Failed to send data with header to channel. Sender task must have been dropped.");
@@ -80,7 +81,8 @@ impl ShardusNetSender {
         let serialized_header = header_serialize_factory(header_version, header).expect("Failed to serialize header");
         let mut message = Message::new_unsigned(header_version, serialized_header.clone(), compressed_data.clone());
         message.sign(shardus_crypto::get_shardus_crypto_instance(), &self.key_pair);
-        let serialized_message = wrap_serialized_message(message.serialize());
+        let mut serialized_message = message.serialize();
+        wrap_serialized_message(&mut serialized_message);
     
         for (address, sender) in addresses.into_iter().zip(senders.into_iter()) {
             self.send_channel
