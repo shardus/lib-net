@@ -2,7 +2,6 @@ use super::runtime::RUNTIME;
 use crate::header::header_types::Header;
 use crate::header_factory::{header_serialize_factory, wrap_serialized_message};
 use crate::message::Message;
-use crate::oneshot::Sender;
 use crate::shardus_crypto;
 use log::error;
 #[cfg(debug)]
@@ -31,9 +30,14 @@ pub enum SenderError {
 
 pub type SendResult = Result<(), SenderError>;
 
+pub enum Transmitter<T> {
+    Oneshot(tokio::sync::oneshot::Sender<T>),
+    Mpsc(UnboundedSender<T>),
+}
+
 pub struct ShardusNetSender {
     key_pair: crypto::KeyPair,
-    send_channel: UnboundedSender<(SocketAddr, Vec<u8>, Sender<SendResult>)>,
+    send_channel: UnboundedSender<(SocketAddr, Vec<u8>, Transmitter<SendResult>)>,
     evict_socket_channel: UnboundedSender<SocketAddr>,
 }
 
@@ -53,15 +57,15 @@ impl ShardusNetSender {
     }
 
     // send: send data to a socket address without a header
-    pub fn send(&self, address: SocketAddr, data: String, complete_tx: Sender<SendResult>) {
+    pub fn send(&self, address: SocketAddr, data: String, complete_tx: tokio::sync::oneshot::Sender<SendResult>) {
         let data = data.into_bytes();
         self.send_channel
-            .send((address, data, complete_tx))
+            .send((address, data, Transmitter::Oneshot(complete_tx)))
             .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
     }
 
     // send_with_header: send data to a socket address with a header and signature
-    pub fn send_with_header(&self, address: SocketAddr, header_version: u8, mut header: Header, data: Vec<u8>, complete_tx: Sender<SendResult>) {
+    pub fn send_with_header(&self, address: SocketAddr, header_version: u8, mut header: Header, data: Vec<u8>, complete_tx: tokio::sync::oneshot::Sender<SendResult>) {
         let compressed_data = header.compress(data);
         header.set_message_length(compressed_data.len() as u32);
         let serialized_header = header_serialize_factory(header_version, header).expect("Failed to serialize header");
@@ -69,12 +73,12 @@ impl ShardusNetSender {
         message.sign(shardus_crypto::get_shardus_crypto_instance(), &self.key_pair);
         let serialized_message = wrap_serialized_message(message.serialize());
         self.send_channel
-            .send((address, serialized_message, complete_tx))
+            .send((address, serialized_message, Transmitter::Oneshot(complete_tx)))
             .expect("Unexpected! Failed to send data with header to channel. Sender task must have been dropped.");
     }
 
     // multi_send_with_header: send data to multiple socket addresses with a single header and signature
-    pub fn multi_send_with_header(&self, addresses: Vec<SocketAddr>, header_version: u8, mut header: Header, data: Vec<u8>, senders: Vec<Sender<SendResult>>) {
+    pub fn multi_send_with_header(&self, addresses: Vec<SocketAddr>, header_version: u8, mut header: Header, data: Vec<u8>, complete_tx: tokio::sync::mpsc::UnboundedSender<SendResult>) {
         let compressed_data = header.compress(data);
         header.set_message_length(compressed_data.len() as u32);
         let serialized_header = header_serialize_factory(header_version, header).expect("Failed to serialize header");
@@ -82,9 +86,9 @@ impl ShardusNetSender {
         message.sign(shardus_crypto::get_shardus_crypto_instance(), &self.key_pair);
         let serialized_message = wrap_serialized_message(message.serialize());
     
-        for (address, sender) in addresses.into_iter().zip(senders.into_iter()) {
+        for  address in addresses {
             self.send_channel
-                .send((address, serialized_message.clone(), sender))
+                .send((address, serialized_message.clone(), Transmitter::Mpsc(complete_tx.clone())))
                 .expect("Failed to send data with header to channel");
         }
     }
@@ -111,7 +115,7 @@ impl ShardusNetSender {
         });
     }
 
-    fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, Vec<u8>, Sender<SendResult>)>, connections: Arc<Mutex<dyn ConnectionCache + Send>>) {
+    fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, Vec<u8>, Transmitter<SendResult>)>, connections: Arc<Mutex<dyn ConnectionCache + Send>>) {
         RUNTIME.spawn(async move {
             let mut send_channel_rx = send_channel_rx;
 
@@ -123,7 +127,14 @@ impl ShardusNetSender {
 
                 RUNTIME.spawn(async move {
                     let result = connection.send(data).await;
-                    complete_tx.send(result).ok();
+                    match complete_tx {
+                        Transmitter::Oneshot(complete_tx) => {
+                            complete_tx.send(result).ok().expect("Failed to send result to oneshot rx")
+                        }
+                        Transmitter::Mpsc(complete_tx) => {
+                            complete_tx.send(result).ok().expect("Failed to send result to mspc rx, rx might have been dropped")
+                        }
+                    }
                 });
             }
 

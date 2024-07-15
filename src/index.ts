@@ -139,7 +139,7 @@ export const Sn = (opts: SnOpts) => {
       version: number
       headerData: CombinedHeader
     },
-    awaitProcessing: boolean = true
+    callbackEnabled: boolean = true
   ) => {
     return new Promise<{ success: boolean; error?: string }>((resolve, reject) => {
       const stringifiedData = jsonStringify(augData, opts.customStringifier)
@@ -168,7 +168,7 @@ export const Sn = (opts: SnOpts) => {
               stringifiedHeader,
               stringifiedData,
               sendCallback,
-              awaitProcessing
+              callbackEnabled
             )
           } else {
             if (logFlags.net_verbose) console.log('send_with_header')
