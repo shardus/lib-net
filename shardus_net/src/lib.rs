@@ -338,11 +338,11 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
         if schedule_complete_callback {
             nodejs_thread_channel.send(move |mut cx| {
                 let cx = &mut cx;
-                let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
-                (**stats).borrow_mut().decrement_outstanding_sends();
 
                 let js_arr = cx.empty_array();
                 for i in 0..results.len() {
+                    let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
+                    (**stats).borrow_mut().decrement_outstanding_sends();
                     if let Err(err) = &results[i] {
                         let err = cx.string(format!("{:?}", err));
                         js_arr.set(cx, i as u32, err)?;
