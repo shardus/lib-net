@@ -148,11 +148,22 @@ export const Sn = (opts: SnOpts) => {
         : null
       /* prettier-ignore */ if(logFlags.net_verbose) logMessageInfo(augData, stringifiedData)
 
-      const sendCallback = (error) => {
+      const multiSendCallback = (error: string[]) => {
+        if (error.length == address.length) {
+          throw new Error(`_sendAug: request_id: ${augData.UUID} error sending from rust failure lib-net: ${error.join(', ')}`)
+        } 
+        if (error.length > 0) {
+          return resolve({ success: false, error: error.join(', ') })
+        }
+        return resolve({ success: true })
+      }
+
+      const sendCallback = (error?: string) => {
         if (error) {
           resolve({ success: false, error })
-        } else {
+        }else {
           resolve({ success: true })
+        
         }
       }
       try {
@@ -167,7 +178,7 @@ export const Sn = (opts: SnOpts) => {
               optionalHeader.version,
               stringifiedHeader,
               stringifiedData,
-              sendCallback,
+              multiSendCallback,
               callbackEnabled
             )
           } else {
