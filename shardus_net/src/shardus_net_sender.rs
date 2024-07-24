@@ -81,7 +81,7 @@ impl ShardusNetSender {
         let mut message = Message::new_unsigned(header_version, serialized_header.clone(), compressed_data.clone());
         message.sign(shardus_crypto::get_shardus_crypto_instance(), &self.key_pair);
         let serialized_message = wrap_serialized_message(message.serialize());
-    
+
         for (address, sender) in addresses.into_iter().zip(senders.into_iter()) {
             self.send_channel
                 .send((address, serialized_message.clone(), sender))
@@ -192,8 +192,11 @@ impl Connection {
 
     async fn write_data_to_stream(socket: &mut TcpStream, data: Vec<u8>) -> io::Result<()> {
         let len = data.len() as u32;
-        socket.write_u32(len).await?;
-        socket.write_all(&data).await
+        let mut buffer = Vec::with_capacity(4 + data.len());
+        buffer.extend_from_slice(&len.to_be_bytes());
+        buffer.extend_from_slice(&data);
+
+        socket.write_all(&buffer).await
     }
 }
 
