@@ -569,8 +569,10 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
     let gas_valid = gas_limit.ge(&base_fee);
 
     let js_is_valid = cx.boolean(is_valid & gas_valid);
+    let js_gas_valid = cx.boolean(gas_valid);
     result.set(cx, "address", js_addr)?;
     result.set(cx, "isValid", js_is_valid)?;
+    result.set(cx, "gasValid", js_gas_valid)?;
 
     Ok(result)
 }
