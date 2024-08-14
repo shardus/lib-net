@@ -1,7 +1,7 @@
 use crate::header::header_types::RequestMetadata;
 use crate::header_factory::header_deserialize_factory;
 use crate::message::Message;
-use crate::{shardus_crypto, HEADER_SIZE_LIMIT_IN_BYTES};
+use crate::{shardus_crypto, HEADER_SIZE_LIMIT_IN_BYTES, PAYLOAD_SIZE_LIMIT_IN_BYTES};
 
 use super::runtime::RUNTIME;
 
@@ -92,6 +92,11 @@ impl ShardusNetListener {
     async fn receive(socket_stream: TcpStream, remote_addr: SocketAddr, received_msg_tx: UnboundedSender<(String, SocketAddr, Option<RequestMetadata>)>) -> ListenerResult<()> {
         let mut socket_stream: TcpStream = socket_stream;
         while let Ok(msg_len) = socket_stream.read_u32().await {
+            if (msg_len as usize) > PAYLOAD_SIZE_LIMIT_IN_BYTES {
+                error!("Message length exceeds the limit of 2MB");
+                continue;
+            }
+
             let mut buffer: Vec<u8> = vec![0; msg_len as usize];
 
             // @TODO: Do a security check in the case that a sender sends an incorrect length.
