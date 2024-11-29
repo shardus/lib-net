@@ -40,6 +40,8 @@ use crate::shardus_net_sender::Connection;
 const ENABLE_COMPRESSION: bool = false;
 const HEADER_SIZE_LIMIT_IN_BYTES: usize = 2 * 1024; // 2KB
 const PAYLOAD_SIZE_LIMIT_IN_BYTES: usize = 2 * 1024 * 1024; // 2MB
+const SIGNATURE_SIZE_LIMIT_IN_BYTES: usize = 96;
+const OWNER_SIZE_LIMIT_IN_BYTES: usize = 32;
 
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
@@ -576,6 +578,13 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
     result.set(cx, "gasValid", js_gas_valid)?;
 
     Ok(result)
+}
+
+fn check_variable_size(variable_len: u32, buffer_size_limit: usize) {
+    if variable_len as usize > buffer_size_limit {
+        panic!("variable_len : {} exceeds the limit of {} bytes", variable_len, buffer_size_limit);
+    }
+    // Continue with the flow if the variable is under the limit
 }
 
 #[neon::main]
