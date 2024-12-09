@@ -1,8 +1,14 @@
 import { Command } from 'commander'
 import { Sn } from '../.'
-import { AppHeader, Sign } from '../build/src/types'
 
-const setupLruSender = (port: number, lruSize: number) => {
+const setupLruSender = (
+  port: number,
+  lruSize: number,
+  limits: {
+    payloadSize?: number
+    headerSize?: number
+  }
+) => {
   return Sn({
     port,
     address: '127.0.0.1',
@@ -18,6 +24,10 @@ const setupLruSender = (port: number, lruSize: number) => {
     headerOpts: {
       sendHeaderVersion: 1,
     },
+    payloadOpts: {
+      payloadSizeLimitInBytes: limits.payloadSize || 2 * 1024 * 1024, // Default 2MB
+      headerSizeLimitInBytes: limits.headerSize || 2 * 1024, // Default 2KB
+    },
   })
 }
 
@@ -26,10 +36,13 @@ const main = async () => {
     create a cli with the following options:
       -p, --port <port> Port to listen on
       -c, --cache <size> Size of the LRU cache
+      --payload-size <size> Payload size limit in bytes
+      --header-size <size> Header size limit in bytes
     
     the cli should create a sender with the following options:
       - lruSize: <size>
       - port: <port>
+      - limits: { payloadSize, headerSize}
 
     on running the cli a listener should be started and sending of message with input from terminal should be allowed
   */
@@ -37,8 +50,8 @@ const main = async () => {
   /*
     Commands to use for multi_send_with_header
 
-    ts-node test/test_multi_send.ts -p 44000 -c 2
-    path/to/test_multi_send.ts -p <port> -c <cache_size>
+    ts-node test/test_multi_send.ts -p 44000 -c 2 --payload-size 2097152 --header-size 2048
+    path/to/test_multi_send.ts -p <port> -c <cache_size> --payload-size <size> --header-size <size>
 
     data 3 ping
     <route> <connections to send data> <message>
@@ -49,14 +62,20 @@ const main = async () => {
   const program = new Command()
   program.requiredOption('-p, --port <port>', 'Port to listen on')
   program.option('-c, --cache <size>', 'Size of the LRU cache', '2')
+  program.option('--payload-size <size>', 'Payload size limit in bytes', '2097152') // Default 2MB
+  program.option('--header-size <size>', 'Header size limit in bytes', '2048') // Default 2KB
   program.parse(process.argv)
 
   const port = program.port.toString()
   const cacheSize = program.cache.toString()
+  const limits = {
+    payloadSize: +program.payloadSize,
+    headerSize: +program.headerSize,
+  }
 
   console.log(`Starting listener on port ${port} with cache size ${cacheSize}`)
-
-  const sn = setupLruSender(+port, +cacheSize)
+  console.log(`Limits: ${JSON.stringify(limits, null, 2)}`)
+  const sn = setupLruSender(+port, +cacheSize, limits)
 
   const input = process.stdin
   input.addListener('data', async (data: Buffer) => {
@@ -86,7 +105,7 @@ const main = async () => {
         },
         1000
       )
-      console.log('Message sent', message)
+      console.log('Message sent: ', message)
     } else if (inputs.length === 2) {
       sn.evictSocket(+inputs[1], '127.0.0.1')
       console.log('Cache cleared')
@@ -100,7 +119,6 @@ const main = async () => {
     if (data && data.message === 'ping') {
       console.log('Received ping from:', data.fromPort)
       console.log('Ping header:', JSON.stringify(header, null, 2))
-      // await sleep(10000)
       return respond(
         { message: 'pong', fromPort: +port },
         {
