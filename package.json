@@ -50,7 +50,7 @@
     "James Harmon"
   ],
   "engines": {
-    "node": "18.16.1"
+    "node": "18.19.1"
   },
   "dependencies": {
     "cargo-cp-artifact": "0.1",
