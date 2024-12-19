@@ -32,6 +32,7 @@ use shardus_net_listener::ShardusNetListener;
 use shardus_net_sender::ConnectionCache;
 use shardus_net_sender::{SendResult, ShardusNetSender};
 use stats::{Incrementers, Stats, StatsResult};
+use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 
@@ -301,13 +302,13 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
     let header_js_string: String = cx.argument::<JsString>(3)?.value(cx) as String;
     let data_js_string: String = cx.argument::<JsString>(4)?.value(cx) as String;
     let complete_cb = cx.argument::<JsFunction>(5)?.root(cx);
-    let await_processing = cx.argument::<JsBoolean>(6)?.value(cx); // this flag lets us skip the processing on the stats and the callback
+    let complete_cb_flag = cx.argument::<JsBoolean>(6)?.value(cx); // this flag lets us skip the processing on the stats and the callback
 
     let shardus_net_sender = cx.this().get::<JsBox<Arc<ShardusNetSender>>, _, _>(cx, "_sender")?;
     let stats_incrementers = cx.this().get::<JsBox<Incrementers>, _, _>(cx, "_stats_incrementers")?;
 
     let this = cx.this().root(cx);
-    let channel = cx.channel();
+    let nodejs_scheduler_channel = cx.channel();
 
     for _ in 0..ports.len() {
         stats_incrementers.increment_outstanding_sends();
@@ -323,51 +324,11 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
 
     let data = data_js_string.into_bytes().to_vec();
 
-    // Create oneshot channels for each host-port pair
-    let mut senders = Vec::with_capacity(hosts.len());
-    let mut receivers = Vec::with_capacity(hosts.len());
 
-    // should a check be added to see if ports.len == hosts.len
-    for _ in 0..hosts.len() {
-        let (sender, receiver) = oneshot::channel::<SendResult>();
-        senders.push(sender);
-        receivers.push(receiver);
-    }
+    let (tx, mut rx) = mpsc::unbounded_channel::<SendResult>();
 
     let complete_cb = Arc::new(complete_cb);
     let this = Arc::new(this);
-
-    // Handle the responses asynchronously
-    for receiver in receivers {
-        let channel = channel.clone();
-        let complete_cb = complete_cb.clone();
-        let this = this.clone();
-
-        RUNTIME.spawn(async move {
-            let result = receiver.await.expect("Complete send tx dropped before notify");
-
-            if await_processing {
-                RUNTIME.spawn_blocking(move || {
-                    channel.send(move |mut cx| {
-                        let cx = &mut cx;
-                        let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
-                        (**stats).borrow_mut().decrement_outstanding_sends();
-
-                        let this = cx.undefined();
-
-                        if let Err(err) = result {
-                            let error = cx.string(format!("{:?}", err));
-                            complete_cb.to_inner(cx).call(cx, this, [error.upcast()])?;
-                        } else {
-                            complete_cb.to_inner(cx).call(cx, this, [])?;
-                        }
-
-                        Ok(())
-                    });
-                });
-            }
-        });
-    }
 
     let mut addresses = Vec::new();
     for (host, port) in hosts.iter().zip(ports.iter()) {
@@ -384,8 +345,41 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
         return cx.throw_type_error("No valid addresses provided");
     }
 
+    RUNTIME.spawn(async move {
+        let mut results = Vec::new();
+
+        while let Some(result) = rx.recv().await {
+            results.push(result);
+        }
+
+
+        if complete_cb_flag {
+            nodejs_scheduler_channel.send(move |mut cx| {
+                let cx = &mut cx;
+
+                let js_arr = cx.empty_array();
+                let mut error_count = 0;
+                for result in results.iter() {
+                    let stats = this.to_inner(cx).get::<JsBox<RefCell<Stats>>, _, _>(cx, "_stats")?;
+                    (**stats).borrow_mut().decrement_outstanding_sends();
+                    if let Err(err) = result {
+                        let err = cx.string(format!("{:?}", err));
+                        js_arr.set(cx, error_count, err)?;
+                        error_count += 1;
+                    }
+                }
+
+                let undef = cx.undefined();
+
+                complete_cb.to_inner(cx).call(cx, undef, [js_arr.upcast()])?;
+
+                Ok(())
+            });
+        }
+    });
+
     // Send each address with its corresponding sender
-    shardus_net_sender.multi_send_with_header(addresses, header_version, header, data, senders);
+    shardus_net_sender.multi_send_with_header(addresses, header_version, header, data, tx);
 
     Ok(cx.undefined())
 }
