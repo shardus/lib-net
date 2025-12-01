@@ -102,15 +102,15 @@ impl ShardusNetListener {
                 // Fix 1: Close the connection when payload size exceeds limit
                 return Ok(());
             }
-    
+
             let mut buffer: Vec<u8> = vec![0; msg_len as usize];
-    
+
             // Fix 2: Handle read_exact errors properly
             if let Err(err) = socket_stream.read_exact(&mut buffer).await {
                 error!("Failed to read message from socket: {}", err);
                 return Err(ListenerError::ReadStreamError(err));
             }
-    
+
             // Fix 3: Improved buffer handling logic
             if buffer.is_empty() {
                 // Close the connection if buffer is empty - stream is likely corrupted
@@ -119,7 +119,7 @@ impl ShardusNetListener {
             } else if buffer[0] == 0x1 {
                 // Header is present
                 let msg_bytes = &buffer[1..];
-    
+
                 let mut cursor = Cursor::new(msg_bytes);
                 let message = match Message::deserialize(&mut cursor, &net_config) {
                     Some(msg) => msg,
@@ -128,13 +128,13 @@ impl ShardusNetListener {
                         return Ok(());
                     }
                 };
-                
+
                 if !message.verify(shardus_crypto::get_shardus_crypto_instance()) {
                     error!("Failed to verify message signature from {}", remote_addr);
                     return Ok(());
                 }
                 info!("Message verified!");
-    
+
                 let mut header_cursor = Cursor::new(message.header);
                 let header = match header_deserialize_factory(message.header_version, &mut header_cursor, &net_config) {
                     Some(hdr) => hdr,
@@ -143,23 +143,23 @@ impl ShardusNetListener {
                         return Ok(());
                     }
                 };
-    
+
                 let data = message.data;
-    
+
                 if !header.validate(&data) {
                     error!("Failed to validate data with header from {}", remote_addr);
                     return Ok(());
                 }
-    
+
                 let request_metadata = RequestMetadata {
                     version: message.header_version,
                     header_json_string: header.to_json_string(),
                     sign_json_string: message.sign.to_json_string(),
                 };
-    
+
                 //let decompressed_data_bytes = header.decompress(data.as_slice()).expect("Failed to decompress message");
                 let decompressed_data_bytes = data;
-    
+
                 // deserialize remaining bytes as your message
                 let msg = String::from_utf8(decompressed_data_bytes)?;
                 info!("Received message: {}", msg);
@@ -170,7 +170,7 @@ impl ShardusNetListener {
                 received_msg_tx.send((msg, remote_addr, None)).map_err(|_| SendError(()))?;
             }
         }
-    
+
         Ok(())
     }
 }

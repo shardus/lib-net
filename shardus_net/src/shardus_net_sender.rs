@@ -17,7 +17,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::sync::mpsc::{self, unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::Mutex;
 
 #[derive(Error, Debug)]
@@ -35,7 +35,6 @@ pub enum ChannelTransmitterType<T> {
     OneShot(Sender<T>),
     MpscUnboundedSender(UnboundedSender<T>),
 }
-
 
 pub struct ShardusNetSender {
     key_pair: crypto::KeyPair,
@@ -81,14 +80,7 @@ impl ShardusNetSender {
     }
 
     // multi_send_with_header: send data to multiple socket addresses with a single header and signature
-    pub fn multi_send_with_header(
-        &self, 
-        addresses: Vec<SocketAddr>, 
-        header_version: u8, 
-        mut header: Header, 
-        data: Vec<u8>, 
-        tx: mpsc::UnboundedSender<SendResult>
-        ) {
+    pub fn multi_send_with_header(&self, addresses: Vec<SocketAddr>, header_version: u8, mut header: Header, data: Vec<u8>, tx: mpsc::UnboundedSender<SendResult>) {
         //let compressed_data = header.compress(data);
         let compressed_data = data;
         header.set_message_length(compressed_data.len() as u32);
@@ -220,11 +212,11 @@ impl Connection {
     async fn write_data_to_stream(socket: &mut TcpStream, data: &[u8]) -> io::Result<()> {
         let len = data.len() as u32;
         let len_bytes = len.to_be_bytes();
-        
-        socket.write_all(&len_bytes).await?;        
-        socket.write_all(data).await?;        
+
+        socket.write_all(&len_bytes).await?;
+        socket.write_all(data).await?;
         socket.flush().await?;
-        
+
         Ok(())
     }
 }

@@ -33,16 +33,12 @@ impl HeaderV1 {
         let verification_data_bytes = self.verification_data.as_bytes();
 
         // Calculate the total capacity needed:
-        // uuid (16) + message_length (4) + 
+        // uuid (16) + message_length (4) +
         // sender_id length (4) + sender_id bytes +
         // tracker_id length (4) + tracker_id bytes +
         // verification_data length (4) + verification_data bytes +
         // compression (4)
-        let capacity = 16 + 4 +
-            4 + sender_id_bytes.len() +
-            4 + tracker_id_bytes.len() +
-            4 + verification_data_bytes.len() +
-            4;
+        let capacity = 16 + 4 + 4 + sender_id_bytes.len() + 4 + tracker_id_bytes.len() + 4 + verification_data_bytes.len() + 4;
         let mut buffer = Vec::with_capacity(capacity);
 
         // Write uuid (16 bytes)

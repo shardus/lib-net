@@ -362,7 +362,6 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
             results.push(result);
         }
 
-
         if complete_cb_flag {
             nodejs_scheduler.send(move |mut cx| {
                 let cx = &mut cx;
