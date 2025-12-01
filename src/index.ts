@@ -169,6 +169,14 @@ export const Sn = (opts: SnOpts) => {
           }
         }
 
+        const multiSendCallback = (error: string[]) => {
+          if (error.length > 0) {
+            return resolve({ success: false, error: error.join(', ') })
+          }
+          return resolve({ success: true })
+        }
+
+
         if (optionalHeader && stringifiedHeader !== null) {
           /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
           // if it is a multi send operation, from shardus-core, array of ports and addresses shall be sent.
@@ -180,7 +188,7 @@ export const Sn = (opts: SnOpts) => {
               optionalHeader.version,
               stringifiedHeader,
               stringifiedData,
-              sendCallbackMk3,
+              multiSendCallback,
               awaitProcessing
             )
           } else {

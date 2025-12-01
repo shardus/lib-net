@@ -17,7 +17,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tokio::sync::Mutex;
 
 #[derive(Error, Debug)]
@@ -31,9 +31,15 @@ pub enum SenderError {
 
 pub type SendResult = Result<(), SenderError>;
 
+pub enum ChannelTransmitterType<T> {
+    OneShot(Sender<T>),
+    MpscUnboundedSender(UnboundedSender<T>),
+}
+
+
 pub struct ShardusNetSender {
     key_pair: crypto::KeyPair,
-    send_channel: UnboundedSender<(SocketAddr, Arc<Vec<u8>>, Sender<SendResult>)>,
+    send_channel: UnboundedSender<(SocketAddr, Arc<Vec<u8>>, ChannelTransmitterType<SendResult>)>,
     evict_socket_channel: UnboundedSender<SocketAddr>,
 }
 
@@ -56,7 +62,7 @@ impl ShardusNetSender {
     pub fn send(&self, address: SocketAddr, data: String, complete_tx: Sender<SendResult>) {
         let data = Arc::new(data.into_bytes());
         self.send_channel
-            .send((address, Arc::clone(&data), complete_tx))
+            .send((address, Arc::clone(&data), ChannelTransmitterType::OneShot(complete_tx)))
             .expect("Unexpected! Failed to send data to channel. Sender task must have been dropped.");
     }
 
@@ -70,12 +76,19 @@ impl ShardusNetSender {
         let shardus_crypto_instance = shardus_crypto::get_shardus_crypto_instance();
         let serialized_message = Arc::new(message.serialize_optimized(&shardus_crypto_instance, &self.key_pair));
         self.send_channel
-            .send((address, Arc::clone(&serialized_message), complete_tx))
+            .send((address, Arc::clone(&serialized_message), ChannelTransmitterType::OneShot(complete_tx)))
             .expect("Unexpected! Failed to send data with header to channel. Sender task must have been dropped.");
     }
 
     // multi_send_with_header: send data to multiple socket addresses with a single header and signature
-    pub fn multi_send_with_header(&self, addresses: Vec<SocketAddr>, header_version: u8, mut header: Header, data: Vec<u8>, senders: Vec<Sender<SendResult>>) {
+    pub fn multi_send_with_header(
+        &self, 
+        addresses: Vec<SocketAddr>, 
+        header_version: u8, 
+        mut header: Header, 
+        data: Vec<u8>, 
+        tx: mpsc::UnboundedSender<SendResult>
+        ) {
         //let compressed_data = header.compress(data);
         let compressed_data = data;
         header.set_message_length(compressed_data.len() as u32);
@@ -84,9 +97,10 @@ impl ShardusNetSender {
         let shardus_crypto_instance = shardus_crypto::get_shardus_crypto_instance();
         let serialized_message = Arc::new(message.serialize_optimized(&shardus_crypto_instance, &self.key_pair));
 
-        for (address, sender) in addresses.into_iter().zip(senders.into_iter()) {
+        for address in addresses {
+            let tx = tx.clone();
             self.send_channel
-                .send((address, Arc::clone(&serialized_message), sender))
+                .send((address, serialized_message.clone(), ChannelTransmitterType::MpscUnboundedSender(tx)))
                 .expect("Failed to send data with header to channel");
         }
     }
@@ -113,7 +127,7 @@ impl ShardusNetSender {
         });
     }
 
-    fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, Arc<Vec<u8>>, Sender<SendResult>)>, connections: Arc<Mutex<dyn ConnectionCache + Send>>) {
+    fn spawn_sender(send_channel_rx: UnboundedReceiver<(SocketAddr, Arc<Vec<u8>>, ChannelTransmitterType<SendResult>)>, connections: Arc<Mutex<dyn ConnectionCache + Send>>) {
         RUNTIME.spawn(async move {
             let mut send_channel_rx = send_channel_rx;
 
@@ -132,8 +146,11 @@ impl ShardusNetSender {
                             Err(SenderError::SendFailedError(error, address))
                         }
                     };
-                    complete_tx.send(result).ok();
                     drop(connection);
+                    match complete_tx {
+                        ChannelTransmitterType::OneShot(tx) => tx.send(result).ok(),
+                        ChannelTransmitterType::MpscUnboundedSender(tx) => tx.send(result).ok(),
+                    };
                 });
             }
 
