@@ -1,10 +1,13 @@
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read};
 use uuid::Uuid;
 extern crate serde;
 extern crate serde_json;
 
 use crate::compression::Compression;
 use serde::Deserialize;
+
+use crate::check_variable_size;
+use crate::NetConfig;
 
 #[derive(Deserialize)]
 pub struct HeaderV1 {
@@ -21,43 +24,49 @@ pub struct HeaderV1 {
     pub compression: Compression,
 }
 
+const SENDER_ID_SIZE: usize = 64;
 impl HeaderV1 {
     // Serialize the struct into a Vec<u8>
     pub fn serialize(&self) -> Vec<u8> {
-        let mut buffer = Vec::new();
-
-        // Serialize uuid (16 bytes)
-        buffer.write_all(self.uuid.as_bytes()).unwrap();
-
-        // Serialize message_length (4 bytes)
-        buffer.write_all(&self.message_length.to_le_bytes()).unwrap();
-
-        // Serialize sender_id as bytes and then its length (4 bytes)
         let sender_id_bytes = self.sender_id.as_bytes();
-        let sender_id_len = sender_id_bytes.len() as u32;
-        buffer.write_all(&sender_id_len.to_le_bytes()).unwrap();
-        buffer.write_all(sender_id_bytes).unwrap();
-
-        // Serialize tracker_id as bytes and then its length (4 bytes)
         let tracker_id_bytes = self.tracker_id.as_bytes();
-        let tracker_id_len = tracker_id_bytes.len() as u32;
-        buffer.write_all(&tracker_id_len.to_le_bytes()).unwrap();
-        buffer.write_all(tracker_id_bytes).unwrap();
-
-        // Serialize sender_id as bytes and then its length (4 bytes)
         let verification_data_bytes = self.verification_data.as_bytes();
-        let verification_data_len = verification_data_bytes.len() as u32;
-        buffer.write_all(&verification_data_len.to_le_bytes()).unwrap();
-        buffer.write_all(verification_data_bytes).unwrap();
 
-        // Serialize compression (4 bytes)
-        buffer.write_all(&self.compression.to_u32().to_le_bytes()).unwrap();
+        // Calculate the total capacity needed:
+        // uuid (16) + message_length (4) +
+        // sender_id length (4) + sender_id bytes +
+        // tracker_id length (4) + tracker_id bytes +
+        // verification_data length (4) + verification_data bytes +
+        // compression (4)
+        let capacity = 16 + 4 + 4 + sender_id_bytes.len() + 4 + tracker_id_bytes.len() + 4 + verification_data_bytes.len() + 4;
+        let mut buffer = Vec::with_capacity(capacity);
+
+        // Write uuid (16 bytes)
+        buffer.extend_from_slice(self.uuid.as_bytes());
+
+        // Write message_length (4 bytes)
+        buffer.extend_from_slice(&self.message_length.to_le_bytes());
+
+        // Write sender_id length and sender_id bytes
+        buffer.extend_from_slice(&(sender_id_bytes.len() as u32).to_le_bytes());
+        buffer.extend_from_slice(sender_id_bytes);
+
+        // Write tracker_id length and tracker_id bytes
+        buffer.extend_from_slice(&(tracker_id_bytes.len() as u32).to_le_bytes());
+        buffer.extend_from_slice(tracker_id_bytes);
+
+        // Write verification_data length and verification_data bytes
+        buffer.extend_from_slice(&(verification_data_bytes.len() as u32).to_le_bytes());
+        buffer.extend_from_slice(verification_data_bytes);
+
+        // Write compression (4 bytes)
+        buffer.extend_from_slice(&self.compression.to_u32().to_le_bytes());
 
         buffer
     }
 
     // Deserialize a Vec<u8> cursor into a HeaderV1 struct
-    pub fn deserialize(cursor: &mut Cursor<Vec<u8>>) -> Option<Self> {
+    pub fn deserialize(cursor: &mut Cursor<Vec<u8>>, net_config: &NetConfig) -> Option<Self> {
         // Deserialize uuid
         let mut uuid_bytes = [0u8; 16];
         cursor.read_exact(&mut uuid_bytes).ok()?;
@@ -72,7 +81,7 @@ impl HeaderV1 {
         let mut sender_id_len_bytes = [0u8; 4];
         cursor.read_exact(&mut sender_id_len_bytes).ok()?;
         let sender_id_len = u32::from_le_bytes(sender_id_len_bytes);
-
+        check_variable_size(sender_id_len, SENDER_ID_SIZE);
         let mut sender_id_bytes = vec![0u8; sender_id_len as usize];
         cursor.read_exact(&mut sender_id_bytes).ok()?;
         let sender_id = String::from_utf8(sender_id_bytes).ok()?;
@@ -81,7 +90,7 @@ impl HeaderV1 {
         let mut tracker_id_len_bytes = [0u8; 4];
         cursor.read_exact(&mut tracker_id_len_bytes).ok()?;
         let tracker_id_len = u32::from_le_bytes(tracker_id_len_bytes);
-
+        check_variable_size(tracker_id_len, net_config.header_size_limit);
         let mut tracker_id_bytes = vec![0u8; tracker_id_len as usize];
         cursor.read_exact(&mut tracker_id_bytes).ok()?;
         let tracker_id = String::from_utf8(tracker_id_bytes).ok()?;
@@ -90,7 +99,7 @@ impl HeaderV1 {
         let mut verification_data_len_bytes = [0u8; 4];
         cursor.read_exact(&mut verification_data_len_bytes).ok()?;
         let verification_data_len = u32::from_le_bytes(verification_data_len_bytes);
-
+        check_variable_size(verification_data_len, net_config.header_size_limit);
         let mut verification_data_bytes = vec![0u8; verification_data_len as usize];
         cursor.read_exact(&mut verification_data_bytes).ok()?;
         let verification_data = String::from_utf8(verification_data_bytes).ok()?;
@@ -121,7 +130,7 @@ impl HeaderV1 {
         )
     }
 
-    pub fn validate(&self, message: Vec<u8>) -> bool {
+    pub fn validate(&self, message: &Vec<u8>) -> bool {
         if message.len() != self.message_length as usize {
             return false;
         }
@@ -144,10 +153,13 @@ mod tests {
             verification_data: "verification_data_1".to_string(),
             compression: Compression::None,
         };
-
+        let net_config = NetConfig {
+            header_size_limit: 2 * 1024,
+            payload_size_limit: 2 * 1024 * 1024,
+        };
         let serialized = header.serialize();
         let mut cursor = Cursor::new(serialized);
-        let deserialized = HeaderV1::deserialize(&mut cursor).unwrap();
+        let deserialized = HeaderV1::deserialize(&mut cursor, net_config).unwrap();
 
         assert_eq!(header.uuid, deserialized.uuid);
         assert_eq!(header.message_length, deserialized.message_length);
@@ -187,5 +199,31 @@ mod tests {
             json_str,
             r#"{"uuid": "550e8400-e29b-41d4-a716-446655440000", "message_length": 42, "sender_id": "sender_1", "tracker_id": "tracker_1", "verification_data": "verification_data_1"}"#
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "variable_len exceeds the limit")]
+    fn test_check_variable_size_panic() {
+        let net_config = NetConfig {
+            header_size_limit: 2 * 1024,
+            payload_size_limit: 2 * 1024 * 1024,
+        };
+        // Define a variable length that exceeds the limit
+        let oversized_length = net_config.header_size_limit as u32 + 1;
+
+        // Call the function, expecting it to panic
+        check_variable_size(oversized_length, net_config.header_size_limit);
+    }
+
+    #[test]
+    fn test_check_variable_size_no_panic() {
+        let net_config = NetConfig {
+            header_size_limit: 2 * 1024,
+            payload_size_limit: 2 * 1024 * 1024,
+        };
+        // Define a variable length within the limit : 2048 (0x800)
+        let valid_length = 0x799;
+        // Call the function, ensuring it does not panic
+        check_variable_size(valid_length, net_config.header_size_limit);
     }
 }

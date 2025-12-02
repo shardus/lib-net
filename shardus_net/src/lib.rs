@@ -8,7 +8,7 @@ use std::time::Instant;
 use std::{net::ToSocketAddrs, sync::Arc};
 
 use header_factory::header_from_json_string;
-#[cfg(debug)]
+#[cfg(feature = "debug")]
 use log::info;
 //use log::LevelFilter;
 use lru::LruCache;
@@ -32,15 +32,20 @@ use shardus_net_listener::ShardusNetListener;
 use shardus_net_sender::ConnectionCache;
 use shardus_net_sender::{SendResult, ShardusNetSender};
 use stats::{Incrementers, Stats, StatsResult};
-use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 
 use crate::shardus_net_sender::Connection;
 
 const ENABLE_COMPRESSION: bool = false;
-const HEADER_SIZE_LIMIT_IN_BYTES: usize = 2 * 1024; // 2KB
-const PAYLOAD_SIZE_LIMIT_IN_BYTES: usize = 2 * 1024 * 1024; // 2MB
+
+#[derive(Copy, Clone)]
+pub struct NetConfig {
+    pub header_size_limit: usize,
+    pub payload_size_limit: usize,
+}
+const SIGNATURE_SIZE_LIMIT_IN_BYTES: usize = 96;
+const OWNER_SIZE_LIMIT_IN_BYTES: usize = 32;
 
 fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
@@ -51,13 +56,19 @@ fn create_shardus_net(mut cx: FunctionContext) -> JsResult<JsObject> {
     let use_lru = cx.argument::<JsBoolean>(2)?.value(cx);
     let lru_size = cx.argument::<JsNumber>(3)?.value(cx);
     let hash_key = cx.argument::<JsString>(4)?.value(cx);
+    let hex_signing_sk = cx.argument::<JsString>(5)?.value(cx);
+    let payload_size_limit = cx.argument::<JsNumber>(6)?.value(cx) as usize;
+    let header_size_limit = cx.argument::<JsNumber>(7)?.value(cx) as usize;
+
+    let net_config = NetConfig {
+        header_size_limit,
+        payload_size_limit,
+    };
 
     shardus_crypto::initialize_shardus_crypto_instance(&hash_key);
 
-    let hex_signing_sk = cx.argument::<JsString>(5)?.value(cx);
     let key_pair = shardus_crypto::get_shardus_crypto_instance().get_key_pair_using_sk(&crypto::HexStringOrBuffer::Hex(hex_signing_sk));
-
-    let shardus_net_listener = create_shardus_net_listener(cx, port, host)?;
+    let shardus_net_listener = create_shardus_net_listener(cx, port, host, net_config)?;
     let shardus_net_sender = create_shardus_net_sender(use_lru, NonZeroUsize::new(lru_size as usize).unwrap(), key_pair);
     let (stats, stats_incrementers) = Stats::new();
     let shardus_net_listener = cx.boxed(shardus_net_listener);
@@ -308,7 +319,7 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
     let stats_incrementers = cx.this().get::<JsBox<Incrementers>, _, _>(cx, "_stats_incrementers")?;
 
     let this = cx.this().root(cx);
-    let nodejs_scheduler_channel = cx.channel();
+    let nodejs_scheduler = cx.channel();
 
     for _ in 0..ports.len() {
         stats_incrementers.increment_outstanding_sends();
@@ -324,8 +335,7 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
 
     let data = data_js_string.into_bytes().to_vec();
 
-
-    let (tx, mut rx) = mpsc::unbounded_channel::<SendResult>();
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<SendResult>();
 
     let complete_cb = Arc::new(complete_cb);
     let this = Arc::new(this);
@@ -352,9 +362,8 @@ pub fn multi_send_with_header(mut cx: FunctionContext) -> JsResult<JsUndefined> 
             results.push(result);
         }
 
-
         if complete_cb_flag {
-            nodejs_scheduler_channel.send(move |mut cx| {
+            nodejs_scheduler.send(move |mut cx| {
                 let cx = &mut cx;
 
                 let js_arr = cx.empty_array();
@@ -411,11 +420,11 @@ fn evict_socket(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     }
 }
 
-fn create_shardus_net_listener(cx: &mut FunctionContext, port: f64, host: String) -> Result<Arc<ShardusNetListener>, Throw> {
+fn create_shardus_net_listener(cx: &mut FunctionContext, port: f64, host: String, net_config: NetConfig) -> Result<Arc<ShardusNetListener>, Throw> {
     // @TODO: Verify that a javascript number properly converts here without loss.
     let address = (host, port as u16);
 
-    let shardus_net = ShardusNetListener::new(address);
+    let shardus_net = ShardusNetListener::new(address, net_config);
 
     match shardus_net {
         Ok(net) => Ok(Arc::new(net)),
@@ -425,11 +434,11 @@ fn create_shardus_net_listener(cx: &mut FunctionContext, port: f64, host: String
 
 fn create_shardus_net_sender(use_lru: bool, lru_size: NonZeroUsize, key_pair: crypto::KeyPair) -> Arc<ShardusNetSender> {
     let connections: Arc<Mutex<dyn ConnectionCache + Send>> = if use_lru {
-        #[cfg(debug)]
+        #[cfg(feature = "debug")]
         info!("Using LRU cache with size {} for socket mgmt", lru_size.get());
         Arc::new(Mutex::new(LruCache::new(lru_size)))
     } else {
-        #[cfg(debug)]
+        #[cfg(feature = "debug")]
         info!("Using hashmap for socket mgmt");
         Arc::new(Mutex::new(HashMap::<SocketAddr, Arc<Connection>>::new()))
     };
@@ -570,6 +579,13 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
     result.set(cx, "gasValid", js_gas_valid)?;
 
     Ok(result)
+}
+
+fn check_variable_size(variable_len: u32, buffer_size_limit: usize) {
+    if variable_len as usize > buffer_size_limit {
+        panic!("variable_len : {} exceeds the limit of {} bytes", variable_len, buffer_size_limit);
+    }
+    // Continue with the flow if the variable is under the limit
 }
 
 #[neon::main]
