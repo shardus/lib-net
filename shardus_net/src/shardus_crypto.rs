@@ -1,6 +1,6 @@
-use std::sync::Once;
 use crypto::ShardusCrypto;
 use once_cell::sync::OnceCell;
+use std::sync::Once;
 
 static SHARDUS_CRYPTO_INSTANCE: OnceCell<ShardusCrypto> = OnceCell::new();
 static INIT: Once = Once::new();

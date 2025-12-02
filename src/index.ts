@@ -49,12 +49,23 @@ export const Sn = (opts: SnOpts) => {
   const LRU_SIZE = (opts.senderOpts && opts.senderOpts.lruSize) || 1028
   const HASH_KEY = opts.crypto.hashKey
   const SIGNING_SECRET_KEY_HEX = opts.crypto.signingSecretKeyHex
+  const PAYLOAD_SIZE_LIMIT = opts.payloadOpts?.payloadSizeLimitInBytes || 2 * 1024 * 1024 // 2MB
+  const HEADER_SIZE_LIMIT = opts.payloadOpts?.headerSizeLimitInBytes || 2 * 1024 // 2KB
 
   const HEADER_OPTS = opts.headerOpts || {
     sendHeaderVersion: 0,
   }
 
-  const _net = net.Sn(PORT, ADDRESS, USE_LRU_CACHE, LRU_SIZE, HASH_KEY, SIGNING_SECRET_KEY_HEX)
+  const _net = net.Sn(
+    PORT,
+    ADDRESS,
+    USE_LRU_CACHE,
+    LRU_SIZE,
+    HASH_KEY,
+    SIGNING_SECRET_KEY_HEX,
+    PAYLOAD_SIZE_LIMIT,
+    HEADER_SIZE_LIMIT
+  )
 
   net.setLoggingEnabled(false)
 
@@ -143,7 +154,7 @@ export const Sn = (opts: SnOpts) => {
   ) => {
     return new Promise<{ success: boolean; error?: string }>((resolve, reject) => {
       //must have everything covered by try catch so we can resolve a promise and not leak mem
-      try {      
+      try {
         const stringifiedData = jsonStringify(augData, opts.customStringifier)
         const stringifiedHeader = optionalHeader
           ? jsonStringify(optionalHeader.headerData, opts.customStringifier)
@@ -158,13 +169,13 @@ export const Sn = (opts: SnOpts) => {
           }
         }
 
-
         const multiSendCallback = (error: string[]) => {
           if (error.length > 0) {
             return resolve({ success: false, error: error.join(', ') })
           }
           return resolve({ success: true })
-      }
+        }
+
 
         if (optionalHeader && stringifiedHeader !== null) {
           /* prettier-ignore */ if(logFlags.net_verbose) console.log('sending with header')
@@ -188,7 +199,7 @@ export const Sn = (opts: SnOpts) => {
               optionalHeader.version,
               stringifiedHeader,
               stringifiedData,
-              sendCallbackMk3,
+              sendCallbackMk3
             )
           }
         } else {
@@ -197,21 +208,20 @@ export const Sn = (opts: SnOpts) => {
         }
       } catch (error) {
         console.log('_sendAug - error sending from ts side of shardus-net', error)
-        resolve({ success: false, error: 'error caught in _sendAug 1' });
+        resolve({ success: false, error: 'error caught in _sendAug 1' })
         throw error
       }
 
-      try{
+      try {
         // a timeout of 0 means no return message is expected.
         if (timeout !== 0) {
           //const timer = setTimeout(reqTimeoutScheduler, timeout, augData, onTimeout)
 
-
           const timer = setTimeout(() => {
-            reqTimeoutScheduler(augData, onTimeout);
-            resolve({ success: false, error: 'Request timed out 1' });  // Resolve the promise with a timeout error
-          }, timeout);
-          
+            reqTimeoutScheduler(augData, onTimeout)
+            resolve({ success: false, error: 'Request timed out 1' }) // Resolve the promise with a timeout error
+          }, timeout)
+
           // this is where we bind the response callback to the UUID
           // later extractUUIDHandleData will call this callback if it
           // finds a UUID match.
@@ -224,11 +234,11 @@ export const Sn = (opts: SnOpts) => {
           }
         } else {
           const timer = setTimeout(() => {
-            resolve({ success: false, error: 'Request timed out 2' });  // Resolve the promise with a timeout error
-          }, 300 * 1000); // 5 minutes timeout for requests with no response expected
+            resolve({ success: false, error: 'Request timed out 2' }) // Resolve the promise with a timeout error
+          }, 300 * 1000) // 5 minutes timeout for requests with no response expected
         }
       } catch (error) {
-          resolve({ success: false, error: 'error caught in _sendAug 2' });
+        resolve({ success: false, error: 'error caught in _sendAug 2' })
       }
     })
   }
@@ -383,12 +393,7 @@ export const Sn = (opts: SnOpts) => {
     // This is a wrapped form of the 'handleData' callback the user supplied.
     // Its job is to determine if the incoming data is a response to a request
     // the user sent. It does this by referencing the UUID map object.
-    const extractUUIDHandleData = (
-      augDataStr: string,
-      remote: RemoteSender,
-      header?: AppHeader,
-      sign?: Sign
-    ) => {
+    const extractUUIDHandleData = (augDataStr: string, remote: RemoteSender, header?: AppHeader, sign?: Sign) => {
       // [TODO] Secure this with validation
       let augData: AugmentedData = jsonParse(augDataStr, opts.customJsonParser)
 

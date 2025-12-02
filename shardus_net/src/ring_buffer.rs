@@ -1,6 +1,6 @@
-use std::{fmt::Debug, iter::Sum};
-#[cfg(debug)]
+#[cfg(feature = "debug")]
 use log::info;
+use std::{fmt::Debug, iter::Sum};
 
 pub(crate) struct RingBuffer<T> {
     index: usize,
@@ -48,7 +48,7 @@ impl<T> RingBuffer<T> {
     where
         T: Default + Copy + Ord + Sum<T> + Debug,
     {
-        #[cfg(debug)]
+        #[cfg(feature = "debug")]
         info!("{:?}", self.buffer);
 
         let total = self.buffer.iter().cloned().sum::<T>();
