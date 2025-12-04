@@ -69,7 +69,7 @@ pub fn get_typed_transaction(tx: &ethers::types::Transaction) -> ethers::types::
 }
 
 pub fn get_base_fee(tx: &ethers::types::transaction::eip2718::TypedTransaction) -> U256 {
-    // current shardeum evm is in istanbul hardforks
+    // current shardus evm is in istanbul hardforks
     // legacy transaction gas fee is 21000
     let base_gas = U256::from(21000); // Base intrinsic gas for a transaction
 

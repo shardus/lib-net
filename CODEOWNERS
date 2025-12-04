@@ -4,10 +4,10 @@
 # Please submit requests for new teams to Systems and Automation
 
 # Global approval (all files)
-# * @shardeum/team-name
+# * @shardus/team-name
 
 # Directory-level approval
-/.github/ @shardeum/systems-and-automation
+/.github/ @shardus/systems-and-automation
 
 # Specific file rules
-# README.md @shardeum/team-name
+# README.md @shardus/team-name

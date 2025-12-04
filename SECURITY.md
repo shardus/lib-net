@@ -16,7 +16,7 @@ You have two options to report security issues:
    - This will privately notify the maintainers through GitHub’s security advisory workflow.
 
 2. **Email**
-   - Send a detailed report to: **security at shardeum dot org**
+   - Send a detailed report to: **security at shardus dot com**
 
 ### What to Include
 

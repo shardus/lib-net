@@ -1,5 +1,5 @@
 [package]
-name = "shardeum_utils"
+name = "shardus_utils"
 version = "0.1.0"
 edition = "2021"
 authors = ["Kaung Myatthu <kaung@shardus.com>"]
