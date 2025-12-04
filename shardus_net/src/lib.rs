@@ -544,8 +544,8 @@ fn set_logging_enabled(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
     let cx = &mut cx;
     let raw_tx = cx.argument::<JsString>(0)?.value(cx);
-    let tx = shardeum_utils::get_transaction(&raw_tx);
-    let typed_tx = shardeum_utils::get_typed_transaction(&tx);
+    let tx = shardus_utils::get_transaction(&raw_tx);
+    let typed_tx = shardus_utils::get_typed_transaction(&tx);
 
     let sighash = typed_tx.sighash();
     let v = tx.v.as_u64();
@@ -556,17 +556,17 @@ fn get_sender_address(mut cx: FunctionContext) -> JsResult<JsObject> {
     // Some(1,2,3) is for post EIP-2718 transactions
     // They hash things differently than legacy and chainid is integrated into v.
     let pubkey = match tx.transaction_type {
-        Some(_) => shardeum_utils::ecrecover(sighash, v + 27, r, s, None).unwrap(),
-        None => shardeum_utils::ecrecover(sighash, v, r, s, tx.chain_id).unwrap(),
+        Some(_) => shardus_utils::ecrecover(sighash, v + 27, r, s, None).unwrap(),
+        None => shardus_utils::ecrecover(sighash, v, r, s, tx.chain_id).unwrap(),
     };
 
-    let (addr, is_valid) = shardeum_utils::pub_to_addr(pubkey);
+    let (addr, is_valid) = shardus_utils::pub_to_addr(pubkey);
 
     let result = cx.empty_object();
     let js_addr = cx.string(format!("{:?}", addr));
 
-    let base_fee = shardeum_utils::get_base_fee(&typed_tx);
-    let binding_fee = shardeum_utils::zero_bigint();
+    let base_fee = shardus_utils::get_base_fee(&typed_tx);
+    let binding_fee = shardus_utils::zero_bigint();
     let gas_limit = typed_tx.gas().unwrap_or(&binding_fee);
 
     // this has to be upperbound inclusive

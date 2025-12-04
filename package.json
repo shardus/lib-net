@@ -1,5 +1,5 @@
 {
-  "name": "@shardeum-foundation/lib-net",
+  "name": "@shardus/lib-net",
   "version": "1.6.1",
   "description": "",
   "main": "build/src/index.js",
@@ -10,7 +10,7 @@
     "Cargo.*",
     "shardus_net/**/*",
     "crypto/**/*",
-    "shardeum_utils/**/*",
+    "shardus_utils/**/*",
     "scripts/**/*"
   ],
   "scripts": {
@@ -43,7 +43,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/shardeum/lib-net.git"
+    "url": "https://github.com/shardus/lib-net.git"
   },
   "publishConfig": {
     "access": "public"

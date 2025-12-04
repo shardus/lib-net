@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-lib-net is a hybrid TypeScript/Rust networking library (`@shardeum-foundation/lib-net`) that provides TCP-based JSON message passing between nodes with request/response patterns. The library uses native Rust code for performance-critical networking operations while exposing a TypeScript API for Node.js applications.
+lib-net is a hybrid TypeScript/Rust networking library (`@shardus/lib-net`) that provides TCP-based JSON message passing between nodes with request/response patterns. The library uses native Rust code for performance-critical networking operations while exposing a TypeScript API for Node.js applications.
 
 ## Development Commands
 
@@ -74,7 +74,7 @@ npm run release:prerelease
 - `src/`: TypeScript source code - API layer and Node.js bindings
 - `shardus_net/`: Main Rust crate implementing core networking functionality
 - `crypto/`: Rust crate for cryptographic operations (signing, verification)
-- `shardeum_utils/`: Shared Rust utilities
+- `shardus_utils/`: Shared Rust utilities
 - `test/`: Test files (unit tests in `test/unit/`, integration tests in root)
 - `build/`: TypeScript compilation output
 - `coverage/`: Test coverage reports

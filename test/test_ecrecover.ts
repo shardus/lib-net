@@ -23,7 +23,7 @@ function getTransactionObj(tx): Transaction[TransactionType.Legacy] | Transactio
   try {
     transactionObj = TransactionFactory.fromSerializedData<TransactionType.Legacy>(serializedInput)
   } catch (e) {
-    // if (ShardeumFlags.VerboseLogs) console.log('Unable to get legacy transaction obj', e)
+    // if (ShardusFlags.VerboseLogs) console.log('Unable to get legacy transaction obj', e)
   }
   if (!transactionObj) {
     try {

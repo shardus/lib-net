@@ -2851,7 +2851,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "shardeum_utils"
+name = "shardus_utils"
 version = "0.1.0"
 dependencies = [
  "ethers",
@@ -2873,7 +2873,7 @@ dependencies = [
  "once_cell",
  "serde",
  "serde_json",
- "shardeum_utils",
+ "shardus_utils",
  "thiserror",
  "tokio",
  "uuid",
