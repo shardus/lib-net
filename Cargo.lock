@@ -2851,16 +2851,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shardus_utils"
-version = "0.1.0"
-dependencies = [
- "ethers",
- "hex",
- "secp256k1",
- "sha3",
-]
-
-[[package]]
 name = "shardus_net"
 version = "1.0.2"
 dependencies = [
@@ -2877,6 +2867,16 @@ dependencies = [
  "thiserror",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "shardus_utils"
+version = "0.1.0"
+dependencies = [
+ "ethers",
+ "hex",
+ "secp256k1",
+ "sha3",
 ]
 
 [[package]]
