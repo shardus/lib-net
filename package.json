@@ -8,6 +8,7 @@
     "src/**/*",
     "build/**/*",
     "Cargo.*",
+    "rust-toolchain",
     "shardus_net/**/*",
     "crypto/**/*",
     "shardus_utils/**/*",
