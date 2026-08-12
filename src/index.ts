@@ -213,10 +213,8 @@ export const Sn = (opts: SnOpts) => {
       }
 
       try {
-        // a timeout of 0 means no return message is expected.
+        // a non-zero timeout means we are expecting a response, so we need to set up a timeout scheduler.
         if (timeout !== 0) {
-          //const timer = setTimeout(reqTimeoutScheduler, timeout, augData, onTimeout)
-
           const timer = setTimeout(() => {
             reqTimeoutScheduler(augData, onTimeout)
             resolve({ success: false, error: 'Request timed out 1' }) // Resolve the promise with a timeout error
@@ -233,9 +231,9 @@ export const Sn = (opts: SnOpts) => {
             timestamp: Date.now(),
           }
         } else {
-          const timer = setTimeout(() => {
-            resolve({ success: false, error: 'Request timed out 2' }) // Resolve the promise with a timeout error
-          }, 300 * 1000) // 5 minutes timeout for requests with no response expected
+          // a timeout of 0 means no return message is expected.
+          // true fire and forget.  We will resolve the promise immediately.
+          resolve({ success: true })
         }
       } catch (error) {
         resolve({ success: false, error: 'error caught in _sendAug 2' })
