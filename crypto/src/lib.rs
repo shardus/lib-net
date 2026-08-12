@@ -30,6 +30,7 @@ impl fmt::Display for HexStringOrBuffer {
     }
 }
 
+#[derive(Clone)]
 pub struct KeyPair {
     pub public_key: sodiumoxide::crypto::sign::PublicKey,
     pub secret_key: sodiumoxide::crypto::sign::SecretKey,
