@@ -57,7 +57,7 @@
     "James Harmon"
   ],
   "engines": {
-    "node": "20.19.3"
+    "node": "^24.0.0"
   },
   "dependencies": {
     "cargo-cp-artifact": "0.1",
@@ -84,6 +84,7 @@
     "ts-jest": "27.0.5"
   },
   "overrides": {
-    "got": "11.8.5"
+    "got": "11.8.5",
+    "@types/babel__traverse": "7.20.0"
   }
 }
